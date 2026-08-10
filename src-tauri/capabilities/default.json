@@ -1,11 +1,19 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "enables the default permissions",
+  "description": "Core permissions plus key/value store access, on every platform",
+  "platforms": [
+    "linux",
+    "macOS",
+    "windows",
+    "android",
+    "iOS"
+  ],
   "windows": [
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "store:default"
   ]
 }

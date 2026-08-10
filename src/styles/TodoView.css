@@ -430,3 +430,37 @@
         font-size: 0.8em;
     }
 }
+
+@media (max-width: 480px) {
+    .todo-header {
+        padding: 12px;
+    }
+
+    /* 16px minimum stops iOS Safari from zooming when a field is focused. */
+    .form-group input,
+    .form-group textarea,
+    .date-selector input {
+        font-size: 16px;
+    }
+
+    .form-group input,
+    .date-selector input {
+        min-height: 44px;
+    }
+
+    .add-task-btn {
+        width: 100%;
+        min-height: 44px;
+    }
+
+    .task-checkbox input {
+        width: 28px;
+        height: 28px;
+    }
+
+    .heatmap-cell {
+        width: 36px;
+        height: 36px;
+        font-size: 0.7em;
+    }
+}

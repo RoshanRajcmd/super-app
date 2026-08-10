@@ -26,7 +26,11 @@ body {
 
 .app {
     min-height: 100vh;
+    min-height: 100dvh;
     background-color: var(--color-bg);
+    /* Keep content clear of notches, home indicators and status bars. */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+        env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 /* Home View */
@@ -34,6 +38,7 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    min-height: 100dvh;
     padding: 40px 20px;
 }
 
@@ -77,8 +82,15 @@ body {
     text-align: center;
 }
 
-.app-card:hover {
-    transform: translateY(-8px);
+/* Hover lift is pointer-only; on touch it sticks after a tap. */
+@media (hover: hover) {
+    .app-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+}
+
+.app-card:active {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
@@ -204,7 +216,7 @@ button {
     transform: scale(1.2);
 }
 
-/* Responsive */
+/* Responsive: tablet */
 @media (max-width: 768px) {
     .home {
         padding: 20px 10px;
@@ -214,7 +226,46 @@ button {
         font-size: 2em;
     }
 
+    .home-header {
+        margin-bottom: 30px;
+    }
+
     .app-grid {
         grid-template-columns: 1fr;
+        gap: 20px;
+    }
+}
+
+/* Responsive: phone */
+@media (max-width: 480px) {
+    .home-header h1 {
+        font-size: 1.75em;
+    }
+
+    .home-header p {
+        font-size: 1em;
+    }
+
+    .app-card {
+        padding: 20px;
+    }
+
+    .app-icon {
+        font-size: 2.25em;
+    }
+
+    /* 44px is the minimum comfortable touch target on iOS and Android. */
+    .app-btn,
+    .back-btn,
+    .edit-btn,
+    .save-btn,
+    .cancel-btn {
+        min-height: 44px;
+        padding: 12px 18px;
+    }
+
+    .delete-btn {
+        min-width: 44px;
+        min-height: 44px;
     }
 }

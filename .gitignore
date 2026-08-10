@@ -10,7 +10,13 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+build
 *.local
+
+# Tauri
+src-tauri/target
+# Generated native projects (recreate with `npm run android:init` / `ios:init`)
+src-tauri/gen
 
 # Editor directories and files
 .vscode/*

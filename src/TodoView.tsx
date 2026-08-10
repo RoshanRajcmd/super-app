@@ -20,21 +20,28 @@ export default function TodoView({ onBack }: TodoViewProps) {
         new Date().toISOString().split("T")[0]
     );
 
+    // Hydrate from the persistent store once on mount. The store is an
+    // external system, so reading it here is the intended use of an effect.
     useEffect(() => {
-        loadData();
+        let active = true;
+
+        loadTasks()
+            .then(async (loadedTasks) => {
+                if (!active) return;
+                setTasks(loadedTasks);
+
+                const loadedStats = await updateDailyStats(loadedTasks);
+                if (!active) return;
+                setStats(loadedStats);
+            })
+            .catch((error) => {
+                console.error("Failed to load tasks:", error);
+            });
+
+        return () => {
+            active = false;
+        };
     }, []);
-
-    async function loadData() {
-        try {
-            const loadedTasks = await loadTasks();
-            setTasks(loadedTasks);
-
-            const loadedStats = await updateDailyStats(loadedTasks);
-            setStats(loadedStats);
-        } catch (error) {
-            console.error("Failed to load tasks:", error);
-        }
-    }
 
     async function addTask(taskData: Omit<Task, "id" | "createdAt">) {
         const newTask: Task = {

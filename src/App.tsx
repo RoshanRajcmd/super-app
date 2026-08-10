@@ -1,7 +1,7 @@
 import { useState } from "react";
 import NoteEditor from "./NoteEditor";
 import TodoView from "./TodoView";
-import "./App.css";
+import "./styles/App.css";
 
 type AppView = "home" | "notes" | "todos";
 

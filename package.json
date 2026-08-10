@@ -7,10 +7,20 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "android:init": "tauri android init",
+    "android:dev": "tauri android dev",
+    "android:build": "tauri android build",
+    "ios:init": "tauri ios init",
+    "ios:dev": "tauri ios dev",
+    "ios:build": "tauri ios build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.9.1",
+    "@tauri-apps/plugin-store": "^2.4.4",
     "dayjs": "^1.11.20",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

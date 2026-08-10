@@ -1,39 +1,37 @@
-import { invoke } from "@tauri-apps/api/core";
+import { getStore } from "./keyValueStore";
 import type { Task, DailyStats } from "../types";
 
-const TASKS_FILE = "./data/tasks.json";
-const STATS_FILE = "./data/stats.json";
+const TASKS_KEY = "tasks";
+const STATS_KEY = "stats";
+const NOTE_KEY = "note";
+
+const DEFAULT_NOTE = "# New Note\n\nStart writing...";
 
 export async function loadTasks(): Promise<Task[]> {
-    try {
-        const content = await invoke<string>("read_file", { path: TASKS_FILE });
-        return JSON.parse(content);
-    } catch {
-        return [];
-    }
+    const tasks = await getStore().get<Task[]>(TASKS_KEY);
+    return tasks ?? [];
 }
 
 export async function saveTasks(tasks: Task[]): Promise<void> {
-    await invoke("write_file", {
-        path: TASKS_FILE,
-        content: JSON.stringify(tasks, null, 2),
-    });
+    await getStore().set(TASKS_KEY, tasks);
 }
 
 export async function loadStats(): Promise<DailyStats[]> {
-    try {
-        const content = await invoke<string>("read_file", { path: STATS_FILE });
-        return JSON.parse(content);
-    } catch {
-        return [];
-    }
+    const stats = await getStore().get<DailyStats[]>(STATS_KEY);
+    return stats ?? [];
 }
 
 export async function saveStats(stats: DailyStats[]): Promise<void> {
-    await invoke("write_file", {
-        path: STATS_FILE,
-        content: JSON.stringify(stats, null, 2),
-    });
+    await getStore().set(STATS_KEY, stats);
+}
+
+export async function loadNote(): Promise<string> {
+    const note = await getStore().get<string>(NOTE_KEY);
+    return note ?? DEFAULT_NOTE;
+}
+
+export async function saveNote(content: string): Promise<void> {
+    await getStore().set(NOTE_KEY, content);
 }
 
 export async function updateDailyStats(tasks: Task[]): Promise<DailyStats[]> {

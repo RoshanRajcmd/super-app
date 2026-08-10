@@ -1,42 +1,54 @@
-import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useState, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
+import { loadNote, saveNote } from "./utils/storage";
 import "./styles/NoteEditor.css";
 
 interface NoteEditorProps {
     onBack: () => void;
 }
 
+const FALLBACK_NOTE = "# New Note\n\nStart writing...";
+
 export default function NoteEditor({ onBack }: NoteEditorProps) {
     const [note, setNote] = useState("");
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    const NOTE_PATH = "./data/note.md";
+    // Discard local edits and re-read the stored note. Also used by Cancel.
+    const refreshNote = useCallback(
+        () =>
+            loadNote()
+                .then(setNote)
+                .catch((error) => {
+                    console.error("Failed to load note:", error);
+                    setNote(FALLBACK_NOTE);
+                }),
+        []
+    );
 
+    // Hydrate from the persistent store once on mount.
     useEffect(() => {
-        loadNote();
+        let active = true;
+
+        loadNote()
+            .then((content) => {
+                if (active) setNote(content);
+            })
+            .catch((error) => {
+                console.error("Failed to load note:", error);
+                if (active) setNote(FALLBACK_NOTE);
+            });
+
+        return () => {
+            active = false;
+        };
     }, []);
 
-    async function loadNote() {
-        try {
-            const content = await invoke<string>("read_file", { path: NOTE_PATH });
-            setNote(content);
-        } catch (error) {
-            console.error("Failed to load note:", error);
-            setNote("# New Note\n\nStart writing...");
-        }
-    }
-
-    async function saveNote() {
+    async function handleSave() {
         setIsSaving(true);
         try {
-            await invoke("write_file", {
-                path: NOTE_PATH,
-                content: note,
-            });
+            await saveNote(note);
             setIsEditing(false);
-            console.log("Note saved successfully");
         } catch (error) {
             console.error("Failed to save note:", error);
             alert("Failed to save note");
@@ -57,7 +69,7 @@ export default function NoteEditor({ onBack }: NoteEditorProps) {
                         <>
                             <button
                                 className="save-btn"
-                                onClick={saveNote}
+                                onClick={handleSave}
                                 disabled={isSaving}
                             >
                                 {isSaving ? "Saving..." : "Save"}
@@ -66,7 +78,7 @@ export default function NoteEditor({ onBack }: NoteEditorProps) {
                                 className="cancel-btn"
                                 onClick={() => {
                                     setIsEditing(false);
-                                    loadNote();
+                                    refreshNote();
                                 }}
                             >
                                 Cancel
