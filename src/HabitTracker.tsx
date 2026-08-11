@@ -31,6 +31,7 @@ import {
     today,
 } from "./utils/dateUtils";
 import { isTauri } from "./utils/platform";
+import { getStore } from "./utils/keyValueStore";
 import HabitDayView from "./components/HabitDayView";
 import HabitGrid from "./components/HabitGrid";
 import HabitHeatmap from "./components/HabitHeatmap";
@@ -42,10 +43,13 @@ interface HabitTrackerProps {
     onBack: () => void;
 }
 
+/** Stored preference for pinning the habit column in the grid views. */
+const FROZEN_KEY = "habitColumnFrozen";
+
 /**
  * Habit tracker over a `.csv` file.
  *
- * The workbook is held in a ref, not state: it is a large mutable object that
+ * The parsed sheet is held in a ref, not state: it is a large mutable object that
  * must round-trip byte-for-byte, so React re-renders off a cheap snapshot of the
  * readable part (`sheet`) that is replaced whenever the book changes.
  */
@@ -62,6 +66,7 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
     const [error, setError] = useState<string | null>(null);
     const [warning, setWarning] = useState<string | null>(null);
     const [newHabit, setNewHabit] = useState("");
+    const [frozen, setFrozen] = useState(true);
 
     /** Publish a fresh snapshot so React re-renders after mutating the book. */
     const syncFromBook = useCallback(() => {
@@ -120,8 +125,38 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
         };
     }, [adoptHandle, syncFromBook]);
 
+    // Restore the frozen-column preference. Defaults to on until it arrives, so
+    // the desktop case needs no wait.
+    useEffect(() => {
+        let active = true;
+
+        getStore()
+            .get<boolean>(FROZEN_KEY)
+            .then((saved) => {
+                if (active && typeof saved === "boolean") setFrozen(saved);
+            })
+            .catch((e) => console.error("Failed to load column preference:", e));
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    /** Pin or unpin the habit column, remembering the choice for next time. */
+    function toggleFrozen() {
+        setFrozen((previous) => {
+            const next = !previous;
+            // Fire-and-forget: a failed write only loses the preference, so it
+            // should not block the column from moving.
+            getStore()
+                .set(FROZEN_KEY, next)
+                .catch((e) => console.error("Failed to save column preference:", e));
+            return next;
+        });
+    }
+
     /**
-     * Persist the workbook. On a conflict the on-disk copy wins: it is reloaded
+     * Persist the sheet. On a conflict the on-disk copy wins: it is reloaded
      * and the local edit is dropped, since silently overwriting a sync from
      * another device would lose data.
      */
@@ -232,6 +267,11 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
         }
     }
 
+    /**
+     * Download a copy of the sheet. Browser-only: saves there go to browser
+     * storage, so this is the only way out to a real file. On desktop the picked
+     * CSV is already the source of truth.
+     */
     function handleExport() {
         const current = book.current;
         if (!current) return;
@@ -322,14 +362,15 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
                 </button>
                 <h1>🔥 Habit Tracker</h1>
                 <div className="habit-header-actions">
-                    {isTauri() && (
+                    {isTauri() ? (
                         <button onClick={handleReload} disabled={busy}>
                             Reload
                         </button>
+                    ) : (
+                        <button onClick={handleExport} disabled={busy}>
+                            Export
+                        </button>
                     )}
-                    <button onClick={handleExport} disabled={busy}>
-                        Export
-                    </button>
                 </div>
             </div>
 
@@ -352,7 +393,7 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
                 <HabitProgressBar label="Year" stats={yearStats} prominent={view === "year"} />
                 <div className="habit-streak">
                     <span className="streak-value">{streak}</span>
-                    <span className="streak-label">day perfect streak</span>
+                    <span className="streak-label">🔥 day perfect streak</span>
                 </div>
             </div>
 
@@ -381,6 +422,22 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
                         Today
                     </button>
                 </div>
+
+                {/* Only the grid views have a habit column to pin. */}
+                {(view === "week" || view === "month") && (
+                    <button
+                        className={`freeze-btn ${frozen ? "active" : ""}`}
+                        onClick={toggleFrozen}
+                        aria-pressed={frozen}
+                        title={
+                            frozen
+                                ? "Habit column stays put while scrolling. Click to unpin."
+                                : "Habit column scrolls with the days. Click to pin."
+                        }
+                    >
+                        {frozen ? "📌" : "📍"} Habit column
+                    </button>
+                )}
             </div>
 
             <div className="habit-body">
@@ -412,6 +469,7 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
                             }
                         }}
                         busy={busy}
+                        frozen={frozen}
                     />
                 )}
 

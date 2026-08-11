@@ -37,11 +37,11 @@ export interface HabitRow {
 }
 
 /**
- * The habit spreadsheet as the app understands it: one worksheet per year,
- * habits down column A and one column per day of that year.
+ * The habit sheet as the app understands it: one CSV file per year, habits down
+ * column A and one column per day of that year.
  */
 export interface HabitSheet {
-    /** Calendar year the sheet's active worksheet covers. */
+    /** Calendar year the sheet's day columns cover. */
     year: number;
     habits: HabitRow[];
 }

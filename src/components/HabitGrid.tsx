@@ -10,6 +10,8 @@ interface HabitGridProps {
     onRemoveHabit: (habitName: string) => void;
     /** Toggling is blocked while a save is in flight. */
     busy: boolean;
+    /** Pin the habit column so it stays visible while scrolling sideways. */
+    frozen: boolean;
 }
 
 /**
@@ -24,6 +26,7 @@ export default function HabitGrid({
     onToggle,
     onRemoveHabit,
     busy,
+    frozen,
 }: HabitGridProps) {
     const now = today();
 
@@ -37,7 +40,7 @@ export default function HabitGrid({
 
     return (
         <div className="habit-grid-scroll">
-            <table className="habit-grid">
+            <table className={`habit-grid ${frozen ? "is-frozen" : ""}`}>
                 <thead>
                     <tr>
                         <th className="habit-name-col">Habit</th>

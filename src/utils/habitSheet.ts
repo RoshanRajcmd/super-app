@@ -1,18 +1,27 @@
-import * as XLSX from "xlsx";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import type { HabitRow, HabitSheet } from "../types";
 import { ISO_DAY, daysInYear, toIsoDay } from "./dateUtils";
+import { dayStats } from "./habitStats";
 
 dayjs.extend(customParseFormat);
 
 /**
- * Reading and writing the habit spreadsheet.
+ * Reading and writing the habit sheet, a single UTF-8 CSV file.
  *
- * Layout: one worksheet per calendar year, named after the year. Column A holds
- * the daily-routine habit names, column B the date each habit joined the
- * routine, row 1 holds one date per remaining column, and the intersection is
- * marked when that habit was completed that day.
+ * Layout: row 1 is the header — column A holds the habit names, column B the
+ * date each habit joined the routine, and every remaining column is one day.
+ * Row 2 is the "Daily Progress %" row, holding that day's completion
+ * percentage. Habits start at row 3, and the intersection of a habit and a day
+ * is marked when that habit was completed that day.
+ *
+ * The progress row is derived, not authoritative: it is recomputed from the
+ * marks on every save so a spreadsheet opened by hand shows the same numbers
+ * the app does.
+ *
+ * Habit names may contain emoji, so the file is decoded and encoded as UTF-8
+ * explicitly rather than byte-per-character, and written with a byte-order mark
+ * so Excel also reads them as UTF-8.
  *
  * Everything here is pure — bytes in, bytes out, no I/O. See `habitFile.ts` for
  * the filesystem shell.
@@ -21,20 +30,32 @@ dayjs.extend(customParseFormat);
 const MARK = "x";
 const HABIT_HEADER = "Habit";
 const TRACKED_FROM_HEADER = "Tracked from";
+/** Label in column A of the derived percentage row. */
+const PROGRESS_LABEL = "Daily Progress %";
+/** Where the progress row is written when the sheet has none. */
+const PROGRESS_ROW_INDEX = 1;
 
 /** Header formats accepted when reading a sheet that was not created by us. */
 const HEADER_FORMATS = [ISO_DAY, "YYYY/MM/DD", "DD-MM-YYYY", "DD/MM/YYYY", "MMM D", "D MMM", "MMMM D"];
+/** Of those, the ones that pin down a year on their own. */
+const DATED_FORMATS = HEADER_FORMATS.filter((f) => f.includes("YYYY"));
+
+/** Day 0 of Excel's serial numbering, for sheets exported with raw serials. */
+const SERIAL_EPOCH = "1899-12-30";
+/** Serial range treated as a date: roughly 1954-2119, so "2025" stays a year. */
+const SERIAL_MIN = 20000;
+const SERIAL_MAX = 80000;
 
 /**
- * A parsed workbook plus the coordinates needed to edit it in place.
+ * A parsed sheet plus the coordinates needed to edit it in place.
  *
- * Marks are written back into the original worksheet rather than rebuilt from
- * scratch, so any extra columns, notes, or rows the user keeps in their sheet
- * survive a round trip.
+ * Edits are applied to the original grid rather than rebuilt from scratch, so
+ * any extra columns, notes, or rows the user keeps in their file survive a round
+ * trip.
  */
 export interface HabitBook {
-    workbook: XLSX.WorkBook;
-    sheetName: string;
+    /** The whole file as rows of cells, mutated in place by the editors below. */
+    grid: string[][];
     sheet: HabitSheet;
     /** ISO date -> column index (0-based). */
     dateColumns: Map<string, number>;
@@ -45,111 +66,200 @@ export interface HabitBook {
      * none (one written by hand, or by an older version of this app).
      */
     trackedFromColumn: number | null;
+    /** Row holding the daily percentages. Never `null` after parsing. */
+    progressRow: number | null;
     /** Column headers that could not be read as dates, for surfacing to the user. */
     unreadableHeaders: string[];
 }
 
-function isMarked(value: unknown): boolean {
-    if (value === null || value === undefined) return false;
-    if (typeof value === "boolean") return value;
-    if (typeof value === "number") return value !== 0;
-    if (value instanceof Date) return true;
-    if (typeof value === "string") {
-        const v = value.trim().toLowerCase();
-        return v !== "" && v !== "0" && v !== "false" && v !== "no" && v !== "-";
+/**
+ * Split CSV text into rows of cells, per RFC 4180.
+ *
+ * Handles quoted fields containing commas, doubled quotes, and either line
+ * ending, because the file is expected to be edited in Excel or Google Sheets
+ * between visits.
+ */
+function parseCsv(text: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let field = "";
+    let quoted = false;
+    // A leading byte-order mark would otherwise become part of the first header.
+    let i = text.charCodeAt(0) === 0xfeff ? 1 : 0;
+
+    const endField = () => {
+        row.push(field);
+        field = "";
+    };
+    const endRow = () => {
+        endField();
+        rows.push(row);
+        row = [];
+    };
+
+    for (; i < text.length; i++) {
+        const ch = text[i];
+
+        if (quoted) {
+            if (ch !== '"') {
+                field += ch;
+            } else if (text[i + 1] === '"') {
+                field += '"';
+                i++;
+            } else {
+                quoted = false;
+            }
+            continue;
+        }
+
+        // A quote only opens a quoted field at the start of one; anywhere else
+        // it is a literal character, which is what hand-edited files tend to do.
+        if (ch === '"' && field === "") quoted = true;
+        else if (ch === ",") endField();
+        else if (ch === "\n") endRow();
+        else if (ch === "\r") {
+            endRow();
+            if (text[i + 1] === "\n") i++;
+        } else field += ch;
     }
-    return false;
+
+    // A file ending in a newline leaves nothing pending; anything else is a
+    // final row without a terminator.
+    if (field !== "" || row.length > 0) endRow();
+
+    return rows;
+}
+
+function quoteField(value: string): string {
+    if (!/[",\r\n]/.test(value) && value.trim() === value) return value;
+    return `"${value.replace(/"/g, '""')}"`;
+}
+
+function serializeCsv(grid: string[][]): string {
+    const width = grid.reduce((max, row) => Math.max(max, row.length), 0);
+    return grid
+        .map((row) => {
+            const padded = row.length === width ? row : [...row, ...Array(width - row.length).fill("")];
+            return padded.map(quoteField).join(",");
+        })
+        .join("\r\n");
+}
+
+function cell(grid: string[][], row: number, col: number): string {
+    return grid[row]?.[col] ?? "";
+}
+
+function setCell(grid: string[][], row: number, col: number, value: string): void {
+    while (grid.length <= row) grid.push([]);
+    const cells = grid[row];
+    while (cells.length <= col) cells.push("");
+    cells[col] = value;
+}
+
+function gridWidth(grid: string[][]): number {
+    return grid.reduce((max, row) => Math.max(max, row.length), 0);
+}
+
+function isMarked(value: string): boolean {
+    const v = value.trim().toLowerCase();
+    return v !== "" && v !== "0" && v !== "false" && v !== "no" && v !== "-";
+}
+
+function isProgressLabel(value: string): boolean {
+    return /^daily\s+progress\s*%?$/i.test(value.trim());
 }
 
 /**
  * Read a row-1 header cell as an ISO date.
  *
- * `year` supplies the missing piece for headers like "Mar 4" that omit it.
- * Returns null when the cell cannot be understood as a date at all.
+ * `year` supplies the missing piece for headers like "Mar 4" that omit it, so
+ * pass `null` to accept only headers that carry their own year. Returns null
+ * when the cell cannot be understood as a date at all.
  */
-function resolveHeaderDate(value: unknown, year: number): string | null {
-    if (value === null || value === undefined || value === "") return null;
-
-    if (value instanceof Date) return toIsoDay(dayjs(value));
-
-    // A bare number in a date row is an Excel serial (days since 1899-12-30).
-    if (typeof value === "number") {
-        if (!Number.isFinite(value) || value <= 0) return null;
-        const parsed = XLSX.SSF.parse_date_code(value);
-        if (!parsed) return null;
-        // parse_date_code yields unpadded parts (2025, 1, 6), which a strict
-        // YYYY-MM-DD parse rejects, so pad before handing it to dayjs.
-        const pad = (n: number) => String(n).padStart(2, "0");
-        const d = dayjs(`${parsed.y}-${pad(parsed.m)}-${pad(parsed.d)}`, ISO_DAY, true);
-        return d.isValid() ? toIsoDay(d) : null;
-    }
-
-    if (typeof value !== "string") return null;
+function resolveHeaderDate(value: string, year: number | null): string | null {
     const text = value.trim();
     if (text === "") return null;
 
-    for (const format of HEADER_FORMATS) {
+    // A bare number in a date row is an Excel serial (days since 1899-12-30).
+    if (/^\d+(\.\d+)?$/.test(text)) {
+        const serial = Number(text);
+        if (serial < SERIAL_MIN || serial > SERIAL_MAX) return null;
+        return toIsoDay(dayjs(SERIAL_EPOCH, ISO_DAY, true).add(Math.floor(serial), "day"));
+    }
+
+    for (const format of year === null ? DATED_FORMATS : HEADER_FORMATS) {
         const d = dayjs(text, format, true);
         if (!d.isValid()) continue;
         // Formats without a year default to 2001 in dayjs; pin them to the sheet's year.
-        const withYear = format.includes("YYYY") ? d : d.year(year);
+        const withYear = format.includes("YYYY") ? d : d.year(year as number);
         return toIsoDay(withYear);
     }
     return null;
 }
 
-/** The worksheet to use: the one named for `preferredYear`, else the first. */
-function pickSheetName(workbook: XLSX.WorkBook, preferredYear: number): string {
-    const byYear = workbook.SheetNames.find((n) => n.trim() === String(preferredYear));
-    return byYear ?? workbook.SheetNames[0];
+function findTrackedFromColumn(header: string[]): number | null {
+    for (let col = 1; col < header.length; col++) {
+        if (header[col].trim().toLowerCase() === TRACKED_FROM_HEADER.toLowerCase()) return col;
+    }
+    return null;
 }
 
 /**
- * Parse `.xlsx` bytes into an editable book.
+ * The year the file covers, taken from whichever headers name one outright.
  *
- * `preferredYear` selects which worksheet to read when the workbook holds
- * several; the year is also used to interpret year-less date headers.
+ * A CSV has no worksheet name to read the year off, so the dated headers decide
+ * it and `preferredYear` only breaks ties for a sheet whose headers are all
+ * year-less ("Mar 4").
  */
-export function parseHabitBook(bytes: Uint8Array, preferredYear: number): HabitBook {
-    const workbook = XLSX.read(bytes, { type: "array", cellDates: true });
-    if (workbook.SheetNames.length === 0) {
-        throw new Error("This spreadsheet has no worksheets.");
+function inferYear(header: string[], skipColumn: number | null, preferredYear: number): number {
+    const counts = new Map<number, number>();
+
+    for (let col = 1; col < header.length; col++) {
+        if (col === skipColumn) continue;
+        const iso = resolveHeaderDate(header[col], null);
+        if (iso === null) continue;
+        const y = Number(iso.slice(0, 4));
+        counts.set(y, (counts.get(y) ?? 0) + 1);
     }
 
-    const sheetName = pickSheetName(workbook, preferredYear);
-    const worksheet = workbook.Sheets[sheetName];
-    const grid = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
-        header: 1,
-        blankrows: true,
-        defval: null,
-    });
-
-    const yearFromName = Number(sheetName.trim());
-    const year = Number.isInteger(yearFromName) ? yearFromName : preferredYear;
-
-    const headerRow = grid[0] ?? [];
-
-    // Locate the start-date column before reading dates, so it is not mistaken
-    // for a day column.
-    let trackedFromColumn: number | null = null;
-    for (let col = 1; col < headerRow.length; col++) {
-        const raw = headerRow[col];
-        if (typeof raw === "string" && raw.trim().toLowerCase() === TRACKED_FROM_HEADER.toLowerCase()) {
-            trackedFromColumn = col;
-            break;
+    let best = preferredYear;
+    let bestCount = 0;
+    for (const [y, count] of counts) {
+        if (count > bestCount) {
+            best = y;
+            bestCount = count;
         }
     }
+    return best;
+}
+
+/**
+ * Parse CSV bytes into an editable book.
+ *
+ * `preferredYear` is the year to assume for a sheet whose headers do not state
+ * one; headers that do state a year win.
+ */
+export function parseHabitBook(bytes: Uint8Array, preferredYear: number): HabitBook {
+    const grid = parseCsv(new TextDecoder("utf-8").decode(bytes));
+    if (grid.length === 0) {
+        throw new Error("This CSV file is empty.");
+    }
+
+    const header = grid[0];
+
+    const trackedFromColumn = findTrackedFromColumn(header);
+    const year = inferYear(header, trackedFromColumn, preferredYear);
 
     const dateColumns = new Map<string, number>();
     const unreadableHeaders: string[] = [];
 
-    for (let col = 1; col < headerRow.length; col++) {
+    for (let col = 1; col < header.length; col++) {
         if (col === trackedFromColumn) continue;
-        const raw = headerRow[col];
-        if (raw === null || raw === undefined || raw === "") continue;
+        const raw = header[col];
+        if (raw.trim() === "") continue;
         const iso = resolveHeaderDate(raw, year);
         if (iso === null) {
-            unreadableHeaders.push(String(raw));
+            unreadableHeaders.push(raw);
             continue;
         }
         // First column wins if a date is duplicated, so marks stay in one place.
@@ -165,21 +275,29 @@ export function parseHabitBook(bytes: Uint8Array, preferredYear: number): HabitB
 
     const habits: HabitRow[] = [];
     const habitRows = new Map<string, number>();
+    let progressRow: number | null = null;
 
     for (let row = 1; row < grid.length; row++) {
-        const cells = grid[row] ?? [];
-        const name = typeof cells[0] === "string" ? cells[0].trim() : cells[0] ? String(cells[0]).trim() : "";
+        const name = cell(grid, row, 0).trim();
         if (name === "") continue;
+
+        // The percentages are recomputed on save, so the row is remembered by
+        // position and never treated as a habit.
+        if (isProgressLabel(name)) {
+            if (progressRow === null) progressRow = row;
+            continue;
+        }
+
         if (habitRows.has(name)) continue; // Duplicate habit name: keep the first row.
 
         const done = new Set<string>();
         for (const [iso, col] of dateColumns) {
-            if (isMarked(cells[col])) done.add(iso);
+            if (isMarked(cell(grid, row, col))) done.add(iso);
         }
 
         const declared = trackedFromColumn === null
             ? null
-            : resolveHeaderDate(cells[trackedFromColumn], year);
+            : resolveHeaderDate(cell(grid, row, trackedFromColumn), year);
         // An unreadable or absent start date falls back to the sheet start, but
         // never later than the habit's own earliest mark — a day it was actually
         // completed must count.
@@ -191,87 +309,86 @@ export function parseHabitBook(bytes: Uint8Array, preferredYear: number): HabitB
         habits.push({ name, done, trackedFrom });
     }
 
-    return {
-        workbook,
-        sheetName,
+    const book: HabitBook = {
+        grid,
         sheet: { year, habits },
         dateColumns,
         habitRows,
         trackedFromColumn,
+        progressRow,
         unreadableHeaders,
     };
+
+    // Sheets written by hand or by an older version have no percentage row;
+    // give them one now so every editor below can assume it exists.
+    ensureProgressRow(book);
+    return book;
 }
 
 /**
- * Build a fresh workbook: one worksheet for `year`, a column per day.
+ * Build a fresh book: a header, the percentage row, then one row per habit,
+ * with a column for every day of `year`.
  *
  * `trackedFrom` is the start date recorded for every seed habit — the day the
  * sheet was created, so earlier days in the year are not counted as missed.
  */
 export function createHabitBook(year: number, habitNames: string[], trackedFrom: string): HabitBook {
     const days = daysInYear(year);
-    const header = [HABIT_HEADER, TRACKED_FROM_HEADER, ...days];
-    const rows = habitNames.map((name) => [name, trackedFrom, ...days.map(() => "")]);
+    const blanks = days.map(() => "");
 
-    const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    // Keep the habit column visible while scrolling a year's worth of days.
-    worksheet["!cols"] = [{ wch: 28 }, { wch: 12 }, ...days.map(() => ({ wch: 5 }))];
-    worksheet["!freeze"] = { xSplit: "2", ySplit: "1" };
+    const grid: string[][] = [
+        [HABIT_HEADER, TRACKED_FROM_HEADER, ...days],
+        [PROGRESS_LABEL, "", ...blanks],
+        ...habitNames.map((name) => [name, trackedFrom, ...blanks]),
+    ];
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, String(year));
-
-    // Column 1 is the start date, so day columns begin at 2.
     const dateColumns = new Map<string, number>();
     days.forEach((iso, i) => dateColumns.set(iso, i + 2));
 
     const habitRows = new Map<string, number>();
     const habits: HabitRow[] = habitNames.map((name, i) => {
-        habitRows.set(name, i + 1);
+        habitRows.set(name, i + 2);
         return { name, done: new Set<string>(), trackedFrom };
     });
 
     return {
-        workbook,
-        sheetName: String(year),
+        grid,
         sheet: { year, habits },
         dateColumns,
         habitRows,
         trackedFromColumn: 1,
+        progressRow: PROGRESS_ROW_INDEX,
         unreadableHeaders: [],
     };
 }
 
-/** Grow the worksheet's declared range so it covers `row`/`col`. */
-function extendRange(worksheet: XLSX.WorkSheet, row: number, col: number): void {
-    const ref = worksheet["!ref"];
-    const range: XLSX.Range = ref
-        ? XLSX.utils.decode_range(ref)
-        : { s: { r: 0, c: 0 }, e: { r: 0, c: 0 } };
-
-    range.e.r = Math.max(range.e.r, row);
-    range.e.c = Math.max(range.e.c, col);
-    worksheet["!ref"] = XLSX.utils.encode_range(range);
-}
-
-function activeSheet(book: HabitBook): XLSX.WorkSheet {
-    return book.workbook.Sheets[book.sheetName];
-}
-
-/** Append a date column for `iso` and return its index. */
 function addDateColumn(book: HabitBook, iso: string): number {
-    const worksheet = activeSheet(book);
-    const used = [...book.dateColumns.values()];
-    const highest = Math.max(
-        used.length > 0 ? Math.max(...used) : 0,
-        book.trackedFromColumn ?? 0
-    );
-    const col = highest + 1;
-
-    worksheet[XLSX.utils.encode_cell({ r: 0, c: col })] = { t: "s", v: iso };
-    extendRange(worksheet, 0, col);
+    // Past the last column in use, so an unreadable header the user cares about
+    // is never overwritten.
+    const col = gridWidth(book.grid);
+    setCell(book.grid, 0, col, iso);
     book.dateColumns.set(iso, col);
     return col;
+}
+
+/**
+ * Insert the percentage row, shifting the rows below it down.
+ *
+ * Sheets that predate the row get it in second place, where the app and the
+ * spreadsheet both expect to find it.
+ */
+function ensureProgressRow(book: HabitBook): number {
+    if (book.progressRow !== null) return book.progressRow;
+
+    const at = Math.min(PROGRESS_ROW_INDEX, book.grid.length);
+    book.grid.splice(at, 0, [PROGRESS_LABEL]);
+
+    for (const [name, row] of book.habitRows) {
+        if (row >= at) book.habitRows.set(name, row + 1);
+    }
+
+    book.progressRow = at;
+    return at;
 }
 
 /**
@@ -284,18 +401,13 @@ function addDateColumn(book: HabitBook, iso: string): number {
 function ensureTrackedFromColumn(book: HabitBook): number {
     if (book.trackedFromColumn !== null) return book.trackedFromColumn;
 
-    const worksheet = activeSheet(book);
-    const usedDates = [...book.dateColumns.values()];
-    const col = (usedDates.length > 0 ? Math.max(...usedDates) : 0) + 1;
-
-    worksheet[XLSX.utils.encode_cell({ r: 0, c: col })] = { t: "s", v: TRACKED_FROM_HEADER };
-    extendRange(worksheet, 0, col);
+    const col = gridWidth(book.grid);
+    setCell(book.grid, 0, col, TRACKED_FROM_HEADER);
 
     for (const habit of book.sheet.habits) {
         const row = book.habitRows.get(habit.name);
         if (row === undefined) continue;
-        worksheet[XLSX.utils.encode_cell({ r: row, c: col })] = { t: "s", v: habit.trackedFrom };
-        extendRange(worksheet, row, col);
+        setCell(book.grid, row, col, habit.trackedFrom);
     }
 
     book.trackedFromColumn = col;
@@ -316,37 +428,31 @@ export function addHabit(book: HabitBook, name: string, trackedFrom: string): nu
     const existing = book.habitRows.get(trimmed);
     if (existing !== undefined) return existing;
 
-    const worksheet = activeSheet(book);
+    ensureProgressRow(book);
     const startColumn = ensureTrackedFromColumn(book);
-    const used = [...book.habitRows.values()];
-    const row = (used.length > 0 ? Math.max(...used) : 0) + 1;
+    const row = book.grid.length;
 
-    worksheet[XLSX.utils.encode_cell({ r: row, c: 0 })] = { t: "s", v: trimmed };
-    worksheet[XLSX.utils.encode_cell({ r: row, c: startColumn })] = { t: "s", v: trackedFrom };
-    extendRange(worksheet, row, Math.max(0, startColumn));
+    setCell(book.grid, row, 0, trimmed);
+    setCell(book.grid, row, startColumn, trackedFrom);
 
     book.habitRows.set(trimmed, row);
     book.sheet.habits.push({ name: trimmed, done: new Set<string>(), trackedFrom });
     return row;
 }
 
-/** Remove a habit's row contents and drop it from the in-memory sheet. */
+/** Delete a habit's row and drop it from the in-memory sheet. */
 export function removeHabit(book: HabitBook, name: string): void {
     const row = book.habitRows.get(name);
     if (row === undefined) return;
 
-    const worksheet = activeSheet(book);
-    // Clear the row in place. Deleting it outright would shift every row below,
-    // invalidating the cached indices for the other habits.
-    delete worksheet[XLSX.utils.encode_cell({ r: row, c: 0 })];
-    if (book.trackedFromColumn !== null) {
-        delete worksheet[XLSX.utils.encode_cell({ r: row, c: book.trackedFromColumn })];
-    }
-    for (const col of book.dateColumns.values()) {
-        delete worksheet[XLSX.utils.encode_cell({ r: row, c: col })];
-    }
+    book.grid.splice(row, 1);
 
     book.habitRows.delete(name);
+    for (const [other, otherRow] of book.habitRows) {
+        if (otherRow > row) book.habitRows.set(other, otherRow - 1);
+    }
+    if (book.progressRow !== null && book.progressRow > row) book.progressRow -= 1;
+
     book.sheet.habits = book.sheet.habits.filter((h) => h.name !== name);
 }
 
@@ -359,15 +465,7 @@ export function setMark(book: HabitBook, habitName: string, date: string, done: 
     if (row === undefined) throw new Error(`Unknown habit: ${habitName}`);
 
     const col = book.dateColumns.get(date) ?? addDateColumn(book, date);
-    const worksheet = activeSheet(book);
-    const address = XLSX.utils.encode_cell({ r: row, c: col });
-
-    if (done) {
-        worksheet[address] = { t: "s", v: MARK };
-        extendRange(worksheet, row, col);
-    } else {
-        delete worksheet[address];
-    }
+    setCell(book.grid, row, col, done ? MARK : "");
 
     const habit = book.sheet.habits.find((h) => h.name === habitName);
     if (habit) {
@@ -388,9 +486,7 @@ export function setTrackedFrom(book: HabitBook, habitName: string, date: string)
     if (row === undefined) throw new Error(`Unknown habit: ${habitName}`);
 
     const col = ensureTrackedFromColumn(book);
-    const worksheet = activeSheet(book);
-    worksheet[XLSX.utils.encode_cell({ r: row, c: col })] = { t: "s", v: date };
-    extendRange(worksheet, row, col);
+    setCell(book.grid, row, col, date);
 
     const habit = book.sheet.habits.find((h) => h.name === habitName);
     if (habit) habit.trackedFrom = date;
@@ -406,7 +502,7 @@ export function renameHabit(book: HabitBook, from: string, to: string): void {
     const row = book.habitRows.get(from);
     if (row === undefined) throw new Error(`Unknown habit: ${from}`);
 
-    activeSheet(book)[XLSX.utils.encode_cell({ r: row, c: 0 })] = { t: "s", v: trimmed };
+    setCell(book.grid, row, 0, trimmed);
     book.habitRows.delete(from);
     book.habitRows.set(trimmed, row);
 
@@ -414,8 +510,30 @@ export function renameHabit(book: HabitBook, from: string, to: string): void {
     if (habit) habit.name = trimmed;
 }
 
-/** Serialize the book back to CSV bytes. */
+/**
+ * Recompute the "Daily Progress %" row from the current marks.
+ *
+ * Days with nothing tracked yet — the future, or before the first habit started
+ * — are left blank rather than written as 0%, which would read as a failed day.
+ */
+export function refreshProgressRow(book: HabitBook): void {
+    const row = ensureProgressRow(book);
+    setCell(book.grid, row, 0, PROGRESS_LABEL);
+    if (book.trackedFromColumn !== null) setCell(book.grid, row, book.trackedFromColumn, "");
+
+    for (const [date, col] of book.dateColumns) {
+        const { possible, percent } = dayStats(book.sheet, date);
+        setCell(book.grid, row, col, possible > 0 ? String(Math.round(percent)) : "");
+    }
+}
+
+/**
+ * Serialize the book back to CSV bytes, percentages first.
+ *
+ * A byte-order mark is written so Excel opens the file as UTF-8 and shows emoji
+ * in habit names instead of mojibake.
+ */
 export function serializeHabitBook(book: HabitBook): Uint8Array {
-    const out = XLSX.write(book.workbook, { type: "array", bookType: "csv" });
-    return new Uint8Array(out as ArrayBuffer);
+    refreshProgressRow(book);
+    return new TextEncoder().encode(`\uFEFF${serializeCsv(book.grid)}\r\n`);
 }

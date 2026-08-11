@@ -130,9 +130,13 @@
     overflow: hidden;
 }
 
+/* One green at every percentage — the width already conveys how much is done,
+   so the heat scale is left to the grid and heatmap where colour is the only
+   signal available. Overrides the `level-*` class the bar also carries. */
 .habit-progress-fill {
     height: 100%;
     border-radius: 4px;
+    background: var(--color-progress);
     transition: width 0.3s ease;
 }
 
@@ -252,6 +256,26 @@
     font-size: 0.85em;
 }
 
+.freeze-btn {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--color-text);
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+.freeze-btn:hover {
+    background: var(--color-bg);
+}
+
+.freeze-btn.active {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
 .habit-body {
     flex: 1;
     padding: 0 20px;
@@ -287,23 +311,40 @@
     z-index: 1;
 }
 
+/* Held to a fixed narrow width so the day columns still fit on a phone; long
+   habit names wrap over several lines instead of widening the column. */
 .habit-name-col {
-    position: sticky;
-    left: 0;
     background: var(--color-surface);
     text-align: left !important;
-    min-width: 180px;
-    z-index: 2;
+    width: 120px;
+    min-width: 120px;
+    max-width: 120px;
+    white-space: normal;
+    /* Emoji and single words longer than the column would otherwise overflow it. */
+    overflow-wrap: anywhere;
     font-weight: 500;
 }
 
 .habit-grid thead .habit-name-col {
-    z-index: 3;
     background: var(--color-bg);
+    /* Overrides the nowrap every other header cell needs. */
+    white-space: normal;
+}
+
+/* Pinning the habit column is optional: it keeps names visible while scrolling
+   a long month, but costs width on a narrow screen, so the user chooses. */
+.habit-grid.is-frozen .habit-name-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+}
+
+.habit-grid.is-frozen thead .habit-name-col {
+    z-index: 3;
 }
 
 .habit-name-col .habit-name {
-    margin-right: 8px;
+    margin-right: 4px;
 }
 
 .habit-day-col.is-today {
@@ -680,7 +721,16 @@
         min-width: 140px;
     }
 
+    /* Narrower still on a phone, where every pixel spent here is a day column
+       lost. All three must move together, the width being fixed. */
     .habit-name-col {
-        min-width: 130px;
+        width: 88px;
+        min-width: 88px;
+        max-width: 88px;
+    }
+
+    .habit-grid th,
+    .habit-grid td {
+        padding: 4px 3px;
     }
 }

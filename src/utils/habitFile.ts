@@ -110,7 +110,7 @@ export async function pickSheet(browserFile?: File): Promise<SheetHandle | null>
  * Ask the user where to create a new sheet.
  *
  * The file is not written yet — `bytes` comes back `null` and the caller saves
- * once it has built the workbook. Returns `null` if they cancel.
+ * once it has built the sheet. Returns `null` if they cancel.
  */
 export async function createSheetLocation(suggestedName: string): Promise<SheetHandle | null> {
     if (!isTauri()) {
@@ -136,7 +136,7 @@ export async function reloadSheet(): Promise<SheetHandle> {
 }
 
 /**
- * Write the workbook back, refusing if the file changed since `expectedMtime`.
+ * Write the sheet back, refusing if the file changed since `expectedMtime`.
  *
  * Returns the new modification time. Throws `SheetConflictError` when the
  * on-disk file no longer matches, so the caller can reload rather than

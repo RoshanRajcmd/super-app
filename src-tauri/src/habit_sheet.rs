@@ -126,7 +126,7 @@ pub async fn habit_sheet_pick(app: AppHandle) -> Result<Option<SheetPayload>, St
 /// Choose where to create a new sheet and remember it.
 ///
 /// The file itself is not created here; the frontend follows up with a save
-/// once it has built the workbook. Returns `None` if the user cancels.
+/// once it has built the sheet. Returns `None` if the user cancels.
 #[tauri::command]
 pub async fn habit_sheet_create(app: AppHandle, suggested_name: String) -> Result<Option<SheetPayload>, String> {
     // The dialog supplies the name, but strip any path separators the frontend

@@ -36,7 +36,7 @@ The app is organized as a frontend application with a web-first React experience
 - [src/App.tsx](src/App.tsx) contains the navigation layer and switches between the dashboard, notes, tasks, and habits views.
 - [src/NoteEditor.tsx](src/NoteEditor.tsx) implements markdown editing and note rendering.
 - [src/TodoView.tsx](src/TodoView.tsx) implements the task-management workflow.
-- [src/HabitTracker.tsx](src/HabitTracker.tsx) implements the habit workbook and progress views.
+- [src/HabitTracker.tsx](src/HabitTracker.tsx) implements the habit sheet and progress views.
 
 ### Supporting Code
 
@@ -54,7 +54,7 @@ The long-term direction is:
 
 - Notes stored in Markdown (`.md`)
 - Task or activity tracking data stored in common structured formats such as JSON and CSV-style exports
-- Habit and routine data maintained in file-based workbook formats that can be opened and inspected outside the application
+- Habit and routine data maintained in a plain UTF-8 CSV file that can be opened and inspected outside the application
 - Cloud storage such as Google Drive used as a file location rather than as a managed sync layer
 
 This means the app should read and write files that can be moved between environments and tools without losing their core meaning.
@@ -69,7 +69,6 @@ This means the app should read and write files that can be moved between environ
 - React Markdown
 - DayJS
 - UUID
-- SheetJS / workbook support
 
 ### Desktop Runtime
 

@@ -1,5 +1,4 @@
 import type { PeriodStats } from "../types";
-import { heatLevel } from "../utils/habitStats";
 
 interface HabitProgressBarProps {
     label: string;
@@ -8,13 +7,9 @@ interface HabitProgressBarProps {
     prominent?: boolean;
 }
 
-/**
- * One labelled completion bar. Colour tracks the same 0-4 heat scale as the
- * commit graph, so a good day looks the same wherever it is shown.
- */
+/** One labelled completion bar, filled in a single green up to the percentage. */
 export default function HabitProgressBar({ label, stats, prominent }: HabitProgressBarProps) {
     const empty = stats.possible === 0;
-    const level = heatLevel(stats.percent);
 
     return (
         <div className={`habit-progress ${prominent ? "prominent" : ""}`}>
@@ -33,7 +28,7 @@ export default function HabitProgressBar({ label, stats, prominent }: HabitProgr
                 aria-valuemax={100}
             >
                 <div
-                    className={`habit-progress-fill level-${level}`}
+                    className="habit-progress-fill"
                     style={{ width: `${Math.min(100, stats.percent)}%` }}
                 />
             </div>

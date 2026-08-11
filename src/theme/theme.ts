@@ -165,6 +165,8 @@ export function themeVariables(settings: ThemeSettings): Record<string, string> 
         "--color-warn-text": surface.warnText,
         "--color-warn-border": surface.warnBorder,
         "--color-done-bg": surface.doneBg,
+        /* Fill colour of the habit progress bars, at any percentage. */
+        "--color-progress": "#5dd957",
         "--heat-0": heat[0],
         "--heat-1": heat[1],
         "--heat-2": heat[2],
