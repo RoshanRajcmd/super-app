@@ -172,6 +172,32 @@ button {
     font-family: inherit;
 }
 
+/*
+ * Icon-only buttons. The label lives in aria-label/title instead of the text,
+ * so the square keeps a full touch target without the word taking up width.
+ *
+ * Qualified with `button` so the zero padding outranks the text-button padding
+ * on .save-btn/.cancel-btn/.edit-btn, which is declared further down.
+ */
+button.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+/* react-icons sizes to 1em, which the inherited button font-size leaves too
+   small to read as an icon. Size the glyph directly instead. */
+button.icon-btn svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
 .back-btn {
     background: none;
     border: none;
@@ -208,7 +234,6 @@ button {
     padding: 8px 16px;
     border-radius: var(--radius);
     cursor: pointer;
-    margin-right: 10px;
     transition: background 0.3s ease;
 }
 
@@ -446,6 +471,14 @@ button {
     .cancel-btn {
         min-height: 44px;
         padding: 12px 18px;
+    }
+
+    /* Square up rather than inherit the wide text padding above. */
+    button.icon-btn {
+        width: 44px;
+        height: 44px;
+        min-height: 44px;
+        padding: 0;
     }
 
     .delete-btn {

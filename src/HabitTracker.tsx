@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
+import { RiArrowGoBackFill } from "react-icons/ri";
 import type { HabitSheet, HabitViewMode } from "./types";
 import {
     SheetConflictError,
@@ -241,8 +242,13 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
         return (
             <div className="habit-tracker">
                 <div className="habit-header">
-                    <button className="back-btn" onClick={onBack}>
-                        ← Back
+                    <button
+                        className="back-btn icon-btn"
+                        onClick={onBack}
+                        aria-label="Back"
+                        title="Back"
+                    >
+                        <RiArrowGoBackFill aria-hidden />
                     </button>
                     <h1>🔥 Habit Tracker</h1>
                     <span />
@@ -256,8 +262,13 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
         return (
             <div className="habit-tracker">
                 <div className="habit-header">
-                    <button className="back-btn" onClick={onBack}>
-                        ← Back
+                    <button
+                        className="back-btn icon-btn"
+                        onClick={onBack}
+                        aria-label="Back"
+                        title="Back"
+                    >
+                        <RiArrowGoBackFill aria-hidden />
                     </button>
                     <h1>🔥 Habit Tracker</h1>
                     <span />
@@ -301,8 +312,13 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
     return (
         <div className="habit-tracker">
             <div className="habit-header">
-                <button className="back-btn" onClick={onBack}>
-                    ← Back
+                <button
+                    className="back-btn icon-btn"
+                    onClick={onBack}
+                    aria-label="Back"
+                    title="Back"
+                >
+                    <RiArrowGoBackFill aria-hidden />
                 </button>
                 <h1>🔥 Habit Tracker</h1>
                 <div className="habit-header-actions">

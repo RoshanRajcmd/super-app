@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MdCancel } from "react-icons/md";
 import type { Task } from "../types";
 
 interface TaskFormProps {
@@ -107,8 +108,14 @@ export default function TaskForm({ onAdd, onCancel, defaultDate }: TaskFormProps
                 <button type="submit" className="submit-btn">
                     Add Task
                 </button>
-                <button type="button" className="cancel-btn" onClick={onCancel}>
-                    Cancel
+                <button
+                    type="button"
+                    className="cancel-btn icon-btn"
+                    onClick={onCancel}
+                    aria-label="Cancel"
+                    title="Cancel"
+                >
+                    <MdCancel aria-hidden />
                 </button>
             </div>
         </form>

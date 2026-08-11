@@ -42,7 +42,7 @@ function App() {
         <div className="home">
           <div className="home-header">
             <h1>
-              <BsFillLightningChargeFill className="home-logo" aria-hidden /> SuperApp
+              <BsFillLightningChargeFill className="home-logo" aria-hidden />SuperApp
             </h1>
             <p>Your all-in-one productivity suite</p>
           </div>

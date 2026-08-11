@@ -9,7 +9,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
     padding: 20px;
+    /* Keep the title and actions clear of the fixed theme button (44px + gap). */
+    padding-right: 76px;
     background: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
     box-shadow: var(--shadow);
@@ -17,7 +20,8 @@
 
 .todo-header h1 {
     flex: 1;
-    margin: 0 20px;
+    min-width: 0;
+    margin: 0 10px;
     font-size: 1.5em;
 }
 
@@ -402,14 +406,10 @@
 }
 
 @media (max-width: 768px) {
-    .todo-header {
-        flex-direction: column;
-        gap: 15px;
-        align-items: flex-start;
-    }
-
+    /* Header stays one row: back, title, add. Only the title shrinks. */
     .todo-header h1 {
         margin: 0;
+        font-size: 1.15em;
     }
 
     .form-row {
@@ -434,6 +434,16 @@
 @media (max-width: 480px) {
     .todo-header {
         padding: 12px;
+        padding-right: 68px;
+        gap: 6px;
+    }
+
+    .todo-header h1 {
+        font-size: 1.1em;
+        /* Truncate rather than wrap, so the row height stays fixed. */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     /* 16px minimum stops iOS Safari from zooming when a field is focused. */
@@ -448,8 +458,8 @@
         min-height: 44px;
     }
 
+    /* Full width would break the header row, so keep it a square icon button. */
     .add-task-btn {
-        width: 100%;
         min-height: 44px;
     }
 

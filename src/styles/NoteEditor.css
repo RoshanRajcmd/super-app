@@ -3,14 +3,19 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
-    height: 100dvh;
+    /* .app pads itself by the safe-area insets, so subtract them here or the
+       editor overflows the viewport by that much and the bottom gets cut off. */
+    height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 
 .note-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
     padding: 20px;
+    /* Keep the title and actions clear of the fixed theme button (44px + gap). */
+    padding-right: 76px;
     background: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
     box-shadow: var(--shadow);
@@ -18,13 +23,15 @@
 
 .note-header h1 {
     flex: 1;
-    margin: 0 20px;
+    min-width: 0;
+    margin: 0 10px;
     font-size: 1.5em;
 }
 
 .note-actions {
     display: flex;
     gap: 10px;
+    flex-shrink: 0;
 }
 
 .note-content {
@@ -156,28 +163,26 @@
 }
 
 @media (max-width: 768px) {
-    .note-editor {
-        height: 100%;
-    }
-
-    .note-header {
-        flex-direction: column;
-        gap: 15px;
-        align-items: flex-start;
-    }
-
+    /* Header stays one row: back, title, actions. Only the title shrinks. */
     .note-header h1 {
         margin: 0;
-    }
-
-    .note-actions {
-        align-self: flex-end;
+        font-size: 1.15em;
     }
 }
 
 @media (max-width: 480px) {
     .note-header {
         padding: 12px;
+        padding-right: 68px;
+        gap: 6px;
+    }
+
+    .note-header h1 {
+        font-size: 1.1em;
+        /* Truncate rather than wrap, so the row height stays fixed. */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .note-content {
