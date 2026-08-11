@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { MdAdd } from "react-icons/md";
-import { RiArrowGoBackFill } from "react-icons/ri";
+import { IoChevronBackCircle } from "react-icons/io5";
 import type { Task, DailyStats } from "./types";
 import { loadTasks, saveTasks, updateDailyStats } from "./utils/storage";
 import { formatDate } from "./utils/dateUtils";
@@ -92,7 +92,7 @@ export default function TodoView({ onBack }: TodoViewProps) {
                     aria-label="Back"
                     title="Back"
                 >
-                    <RiArrowGoBackFill aria-hidden />
+                    <IoChevronBackCircle aria-hidden />
                 </button>
                 <h1>✓ Task Manager</h1>
                 <button

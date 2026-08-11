@@ -209,6 +209,19 @@ button.icon-btn svg {
     transition: background 0.3s ease;
 }
 
+/* Larger than the other icon buttons: it is the primary way out of every screen
+   and the most-hit target in the app. Both selectors are doubly qualified to
+   outrank the shared `button.icon-btn` sizing above. */
+button.back-btn.icon-btn {
+    width: 48px;
+    height: 48px;
+}
+
+button.back-btn.icon-btn svg {
+    width: 30px;
+    height: 30px;
+}
+
 .back-btn:hover {
     background: var(--color-bg);
 }
@@ -479,6 +492,14 @@ button.icon-btn svg {
         height: 44px;
         min-height: 44px;
         padding: 0;
+    }
+
+    /* Stays ahead of the other icon buttons on a phone too, where the rule above
+       would otherwise pull it back down to 44px. */
+    button.back-btn.icon-btn {
+        width: 52px;
+        height: 52px;
+        min-height: 52px;
     }
 
     .delete-btn {

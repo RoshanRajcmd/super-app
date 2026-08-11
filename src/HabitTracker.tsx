@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { RiArrowGoBackFill } from "react-icons/ri";
+import { IoChevronBackCircle } from "react-icons/io5";
 import type { HabitSheet, HabitViewMode } from "./types";
 import {
     SheetConflictError,
@@ -288,7 +288,7 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
                         aria-label="Back"
                         title="Back"
                     >
-                        <RiArrowGoBackFill aria-hidden />
+                        <IoChevronBackCircle aria-hidden />
                     </button>
                     <h1>🔥 Habit Tracker</h1>
                     <span />
@@ -308,7 +308,7 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
                         aria-label="Back"
                         title="Back"
                     >
-                        <RiArrowGoBackFill aria-hidden />
+                        <IoChevronBackCircle aria-hidden />
                     </button>
                     <h1>🔥 Habit Tracker</h1>
                     <span />
@@ -358,7 +358,7 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
                     aria-label="Back"
                     title="Back"
                 >
-                    <RiArrowGoBackFill aria-hidden />
+                    <IoChevronBackCircle aria-hidden />
                 </button>
                 <h1>🔥 Habit Tracker</h1>
                 <div className="habit-header-actions">

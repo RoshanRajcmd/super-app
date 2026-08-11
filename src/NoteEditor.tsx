@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { FaSave, FaRegEdit } from "react-icons/fa";
-import { RiArrowGoBackFill } from "react-icons/ri";
+import { IoChevronBackCircle } from "react-icons/io5";
 import { loadNote, saveNote } from "./utils/storage";
 import "./styles/NoteEditor.css";
 
@@ -72,7 +72,7 @@ export default function NoteEditor({ onBack }: NoteEditorProps) {
                     aria-label="Back"
                     title="Back (saves)"
                 >
-                    <RiArrowGoBackFill aria-hidden />
+                    <IoChevronBackCircle aria-hidden />
                 </button>
                 <h1>📝 Note Editor</h1>
                 <div className="note-actions">
