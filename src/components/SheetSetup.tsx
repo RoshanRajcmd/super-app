@@ -3,9 +3,9 @@ import { isTauri } from "../utils/platform";
 
 interface SheetSetupProps {
     year: number;
-    /** Open an existing workbook. In the browser a `File` comes from the input. */
+    /** Open an existing CSV workbook. In the browser a `File` comes from the input. */
     onOpen: (browserFile?: File) => void;
-    /** Create a workbook seeded with these habit names. */
+    /** Create a CSV workbook seeded with these habit names. */
     onCreate: (habitNames: string[]) => void;
     busy: boolean;
 }
@@ -42,7 +42,7 @@ export default function SheetSetup({ year, onOpen, onCreate, busy }: SheetSetupP
         <div className="sheet-setup">
             <h2>Set up your habit sheet</h2>
             <p className="setup-intro">
-                Habits are stored in an <code>.xlsx</code> spreadsheet: one row per habit,
+                Habits are stored in a <code>.csv</code> spreadsheet: one row per habit,
                 one column per day.{" "}
                 {isTauri()
                     ? "Keep it in your Google Drive folder and every change syncs automatically."
@@ -69,7 +69,7 @@ export default function SheetSetup({ year, onOpen, onCreate, busy }: SheetSetupP
                             <input
                                 ref={fileInput}
                                 type="file"
-                                accept=".xlsx"
+                                accept=".csv,text/csv"
                                 hidden
                                 onChange={(e) => {
                                     const file = e.target.files?.[0];

@@ -43,7 +43,7 @@ interface HabitTrackerProps {
 }
 
 /**
- * Habit tracker over an `.xlsx` file.
+ * Habit tracker over a `.csv` file.
  *
  * The workbook is held in a ref, not state: it is a large mutable object that
  * must round-trip byte-for-byte, so React re-renders off a cheap snapshot of the
@@ -191,7 +191,7 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
         setBusy(true);
         setError(null);
         try {
-            const handle = await createSheetLocation(`habits-${year}.xlsx`);
+            const handle = await createSheetLocation(`habits-${year}.csv`);
             if (!handle) return;
 
             // Seed habits start today: the earlier part of the year was never
@@ -235,7 +235,7 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
     function handleExport() {
         const current = book.current;
         if (!current) return;
-        downloadSheet(serializeHabitBook(current), `habits-${current.sheet.year}.xlsx`);
+        downloadSheet(serializeHabitBook(current), `habits-${current.sheet.year}.csv`);
     }
 
     if (loading) {

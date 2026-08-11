@@ -414,8 +414,8 @@ export function renameHabit(book: HabitBook, from: string, to: string): void {
     if (habit) habit.name = trimmed;
 }
 
-/** Serialize the book back to `.xlsx` bytes. */
+/** Serialize the book back to CSV bytes. */
 export function serializeHabitBook(book: HabitBook): Uint8Array {
-    const out = XLSX.write(book.workbook, { type: "array", bookType: "xlsx" });
+    const out = XLSX.write(book.workbook, { type: "array", bookType: "csv" });
     return new Uint8Array(out as ArrayBuffer);
 }

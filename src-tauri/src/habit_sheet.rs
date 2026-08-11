@@ -1,6 +1,6 @@
 //! Native file access for the habit tracker spreadsheet.
 //!
-//! The webview never supplies a filesystem path. The user picks the `.xlsx`
+//! The webview never supplies a filesystem path. The user picks the `.csv`
 //! once through the OS dialog; that choice is persisted here, in the app-data
 //! directory, and every later read/write resolves it from disk. So a compromised
 //! or buggy frontend cannot redirect file I/O at an arbitrary file.
@@ -24,7 +24,7 @@ const POINTER_FILE: &str = "habit-sheet-path.txt";
 #[derive(Serialize)]
 pub struct SheetPayload {
     pub path: String,
-    /// Base64-encoded `.xlsx` bytes. `None` when the file does not exist yet.
+    /// Base64-encoded `.csv` bytes. `None` when the file does not exist yet.
     pub data: Option<String>,
     /// Milliseconds since the Unix epoch, or `None` if the file does not exist.
     pub mtime: Option<u64>,
@@ -101,7 +101,7 @@ pub fn habit_sheet_current(app: AppHandle) -> Result<Option<SheetPayload>, Strin
     }
 }
 
-/// Open an existing `.xlsx` via the OS picker and remember it.
+/// Open an existing `.csv` via the OS picker and remember it.
 ///
 /// Returns `None` if the user cancels.
 #[tauri::command]
@@ -109,7 +109,7 @@ pub async fn habit_sheet_pick(app: AppHandle) -> Result<Option<SheetPayload>, St
     let picked = app
         .dialog()
         .file()
-        .add_filter("Excel spreadsheet", &["xlsx"])
+        .add_filter("CSV spreadsheet", &["csv"])
         .blocking_pick_file();
 
     let Some(picked) = picked else {
@@ -134,12 +134,12 @@ pub async fn habit_sheet_create(app: AppHandle, suggested_name: String) -> Resul
     let safe_name = Path::new(&suggested_name)
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "habits.xlsx".to_string());
+        .unwrap_or_else(|| "habits.csv".to_string());
 
     let picked = app
         .dialog()
         .file()
-        .add_filter("Excel spreadsheet", &["xlsx"])
+        .add_filter("CSV spreadsheet", &["csv"])
         .set_file_name(&safe_name)
         .blocking_save_file();
 
@@ -150,7 +150,7 @@ pub async fn habit_sheet_create(app: AppHandle, suggested_name: String) -> Resul
         .into_path()
         .map_err(|e| format!("unsupported file location: {e}"))?;
     if path.extension().is_none() {
-        path.set_extension("xlsx");
+        path.set_extension("csv");
     }
 
     write_pointer(&app, &path)?;
@@ -164,7 +164,7 @@ pub fn habit_sheet_read(app: AppHandle) -> Result<SheetPayload, String> {
     load(path)
 }
 
-/// Write base64 `.xlsx` bytes to the remembered sheet.
+/// Write base64 `.csv` bytes to the remembered sheet.
 ///
 /// `expected_mtime` guards against overwriting a copy that changed underneath
 /// us; pass `None` only when the file is not expected to exist yet. The new
@@ -186,8 +186,8 @@ pub fn habit_sheet_write(
     }
 
     // Write to a sibling temp file and rename, so an interrupted write cannot
-    // leave a half-written spreadsheet behind.
-    let temp = path.with_extension("xlsx.tmp");
+    // leave a half-written CSV behind.
+    let temp = path.with_extension("csv.tmp");
     fs::write(&temp, &bytes).map_err(|e| format!("cannot write sheet: {e}"))?;
     fs::rename(&temp, &path).map_err(|e| {
         let _ = fs::remove_file(&temp);

@@ -5,12 +5,12 @@ import { getStore } from "./keyValueStore";
  * Filesystem shell for the habit spreadsheet — the only module here that talks
  * to the outside world.
  *
- * On Tauri the bytes live in a real `.xlsx` the user picks once, typically
+ * On Tauri the bytes live in a real `.csv` the user picks once, typically
  * inside their Google Drive folder so the desktop Drive client syncs every
  * write. The path is held by the Rust side, not passed from here, so the webview
  * cannot aim file I/O at an arbitrary file.
  *
- * In a plain browser there is no such file, so the workbook is kept in the
+ * In a plain browser there is no such file, so the CSV contents are kept in the
  * key/value store and the user exports it by download.
  */
 
@@ -79,7 +79,7 @@ export async function currentSheet(): Promise<SheetHandle | null> {
     if (!isTauri()) {
         const data = await getStore().get<string>(BROWSER_DATA_KEY);
         if (data === null) return null;
-        const name = (await getStore().get<string>(BROWSER_NAME_KEY)) ?? "habits.xlsx";
+        const name = (await getStore().get<string>(BROWSER_NAME_KEY)) ?? "habits.csv";
         return { path: name, bytes: decode(data), mtime: null };
     }
 
@@ -88,7 +88,7 @@ export async function currentSheet(): Promise<SheetHandle | null> {
 }
 
 /**
- * Ask the user to pick an existing `.xlsx`.
+ * Ask the user to pick an existing `.csv`.
  *
  * Returns `null` if they cancel. In the browser the caller supplies the bytes
  * from a file input, since there is no OS picker to reach for.
@@ -159,11 +159,11 @@ export async function saveSheet(bytes: Uint8Array, expectedMtime: number | null)
     }
 }
 
-/** Download the workbook, the browser's stand-in for having a real file. */
+/** Download the CSV file, the browser's stand-in for having a real file. */
 export function downloadSheet(bytes: Uint8Array, fileName: string): void {
     // Copy into a fresh buffer: the view may sit inside a larger ArrayBuffer.
     const blob = new Blob([bytes.slice()], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type: "text/csv;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
