@@ -33,7 +33,7 @@
 }
 
 .add-task-btn:hover {
-    background: #218838;
+    filter: brightness(0.9);
 }
 
 /* Task Form */
@@ -71,7 +71,7 @@
 .form-group textarea:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
 .form-row {
@@ -161,7 +161,7 @@
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #28a745, #20c997);
+    background: linear-gradient(90deg, var(--heat-3), var(--heat-2));
     transition: width 0.3s ease;
     display: flex;
     align-items: center;
@@ -203,7 +203,7 @@
 }
 
 .task-item:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px var(--color-shadow-strong, rgba(0, 0, 0, 0.15));
 }
 
 .task-checkbox {
@@ -383,17 +383,17 @@
 }
 
 .heatmap-cell.low {
-    background: #c7e9c0;
-    color: #276419;
+    background: var(--heat-1);
+    color: var(--color-text);
 }
 
 .heatmap-cell.medium {
-    background: #85c68f;
-    color: #0a3622;
+    background: var(--heat-2);
+    color: var(--color-text);
 }
 
 .heatmap-cell.high {
-    background: #239a3b;
+    background: var(--heat-3);
     color: white;
 }
 

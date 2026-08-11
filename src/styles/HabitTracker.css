@@ -1,0 +1,686 @@
+/* Habit Tracker Styles */
+.habit-tracker {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+}
+
+.habit-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    box-shadow: var(--shadow);
+}
+
+.habit-header h1 {
+    flex: 1;
+    margin: 0 20px;
+    font-size: 1.5em;
+}
+
+.habit-header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.habit-header-actions button {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.habit-header-actions button:hover:not(:disabled) {
+    background: var(--color-bg);
+}
+
+.habit-header-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.habit-path {
+    padding: 8px 20px 0;
+    font-size: 0.8em;
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl;
+    text-align: left;
+}
+
+.habit-error,
+.habit-warning {
+    margin: 12px 20px 0;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 0.9em;
+}
+
+.habit-error {
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
+    border: 1px solid var(--color-error-border);
+}
+
+.habit-warning {
+    background: var(--color-warn-bg);
+    color: var(--color-warn-text);
+    border: 1px solid var(--color-warn-border);
+}
+
+.habit-note {
+    padding: 8px 0;
+    font-size: 0.9em;
+    color: var(--color-text-secondary);
+}
+
+/* Summary bars */
+.habit-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    padding: 16px 20px;
+}
+
+.habit-progress {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+}
+
+.habit-progress.prominent {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+
+.habit-progress-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.habit-progress-label {
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-secondary);
+}
+
+.habit-progress-value {
+    font-size: 0.85em;
+    font-variant-numeric: tabular-nums;
+}
+
+.habit-progress-track {
+    height: 8px;
+    background: var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.habit-progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.habit-streak {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+}
+
+.streak-value {
+    font-size: 1.6em;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.streak-label {
+    font-size: 0.75em;
+    color: var(--color-text-secondary);
+    text-align: center;
+}
+
+/* Heat levels, shared by bars, grid cells and the heatmap. Values come from the
+   active theme so the scale stays legible in both light and dark. */
+.level-0 {
+    background: var(--heat-0);
+}
+
+.level-1 {
+    background: var(--heat-1);
+}
+
+.level-2 {
+    background: var(--heat-2);
+}
+
+.level-3 {
+    background: var(--heat-3);
+}
+
+.level-4 {
+    background: var(--heat-4);
+}
+
+/* Controls */
+.habit-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 20px 12px;
+}
+
+.view-switcher {
+    display: inline-flex;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--color-surface);
+}
+
+.view-switcher button {
+    border: none;
+    background: transparent;
+    padding: 8px 16px;
+    cursor: pointer;
+    color: var(--color-text);
+    transition: background 0.2s ease;
+}
+
+.view-switcher button:not(:last-child) {
+    border-right: 1px solid var(--color-border);
+}
+
+.view-switcher button:hover {
+    background: var(--color-bg);
+}
+
+.view-switcher button.active {
+    background: var(--color-primary);
+    color: white;
+}
+
+.period-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.period-nav button {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--color-text);
+    line-height: 1;
+}
+
+.period-nav button:hover {
+    background: var(--color-bg);
+}
+
+.period-label {
+    min-width: 190px;
+    text-align: center;
+    font-size: 0.9em;
+    font-variant-numeric: tabular-nums;
+}
+
+.today-btn {
+    font-size: 0.85em;
+}
+
+.habit-body {
+    flex: 1;
+    padding: 0 20px;
+}
+
+/* Grid view */
+.habit-grid-scroll {
+    overflow-x: auto;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.habit-grid {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9em;
+}
+
+.habit-grid th,
+.habit-grid td {
+    border: 1px solid var(--color-border);
+    padding: 6px 8px;
+    text-align: center;
+}
+
+.habit-grid thead th {
+    position: sticky;
+    top: 0;
+    background: var(--color-bg);
+    font-size: 0.8em;
+    white-space: nowrap;
+    z-index: 1;
+}
+
+.habit-name-col {
+    position: sticky;
+    left: 0;
+    background: var(--color-surface);
+    text-align: left !important;
+    min-width: 180px;
+    z-index: 2;
+    font-weight: 500;
+}
+
+.habit-grid thead .habit-name-col {
+    z-index: 3;
+    background: var(--color-bg);
+}
+
+.habit-name-col .habit-name {
+    margin-right: 8px;
+}
+
+.habit-day-col.is-today {
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+.habit-day-col.is-future {
+    color: var(--color-text-secondary);
+}
+
+.habit-cell.is-today {
+    background: var(--color-primary-soft);
+}
+
+/* Days before a habit joined the routine: excluded from its score, so shown as
+   inactive rather than as an unchecked miss. */
+.habit-cell.is-untracked {
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 3px,
+        var(--color-border) 3px,
+        var(--color-border) 4px
+    );
+}
+
+.habit-cell.is-untracked input[type="checkbox"] {
+    opacity: 0.35;
+}
+
+.habit-cell input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.habit-cell input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+.habit-day-score {
+    vertical-align: bottom;
+    height: 48px;
+}
+
+.mini-bar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: 36px;
+    width: 14px;
+    margin: 0 auto;
+    background: var(--color-bg);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.mini-fill {
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    transition: height 0.3s ease;
+}
+
+.remove-habit {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 0.85em;
+}
+
+.remove-habit:hover:not(:disabled) {
+    color: var(--color-danger);
+}
+
+.remove-habit:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Day view */
+.habit-day-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.habit-day-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.habit-day-item.completed {
+    border-color: var(--color-success);
+    background: var(--color-done-bg);
+}
+
+.habit-day-item.untracked {
+    border-style: dashed;
+}
+
+.untracked-tag {
+    margin-left: 8px;
+    padding: 2px 6px;
+    font-size: 0.75em;
+    color: var(--color-text-secondary);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+}
+
+.habit-day-item.completed label {
+    text-decoration: line-through;
+    color: var(--color-text-secondary);
+}
+
+.habit-day-item input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.habit-day-item label {
+    flex: 1;
+    cursor: pointer;
+}
+
+/* Year heatmap */
+.habit-heatmap {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 16px;
+}
+
+.heatmap-scroll {
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.heatmap-months {
+    display: flex;
+    gap: 3px;
+    margin-left: 34px;
+    margin-bottom: 4px;
+}
+
+.heatmap-month {
+    width: 13px;
+    flex-shrink: 0;
+    font-size: 0.7em;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+.heatmap-body {
+    display: flex;
+    gap: 4px;
+}
+
+.heatmap-weekdays {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 30px;
+    flex-shrink: 0;
+}
+
+.heatmap-weekday {
+    height: 13px;
+    font-size: 0.65em;
+    line-height: 13px;
+    color: var(--color-text-secondary);
+}
+
+.heatmap-weeks {
+    display: flex;
+    gap: 3px;
+}
+
+.heatmap-week {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.heatmap-square {
+    width: 13px;
+    height: 13px;
+    border: none;
+    border-radius: 2px;
+    padding: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.heatmap-square.is-blank {
+    background: transparent;
+    cursor: default;
+}
+
+.heatmap-square:not(.is-blank) {
+    /* A faint edge keeps level-0 squares visible against the card. */
+    box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.heatmap-square.is-selected {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+
+.heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 12px;
+    font-size: 0.75em;
+    color: var(--color-text-secondary);
+}
+
+.heatmap-legend .heatmap-square {
+    cursor: default;
+}
+
+/* Add habit row */
+.habit-add-row {
+    display: flex;
+    gap: 8px;
+    padding: 16px 20px;
+}
+
+.habit-add-row input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 1em;
+    font-family: inherit;
+}
+
+.habit-add-row button {
+    background: var(--color-success);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.habit-add-row button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.habit-footer-note {
+    padding: 0 20px 20px;
+    font-size: 0.8em;
+    color: var(--color-text-secondary);
+}
+
+/* Setup screen */
+.sheet-setup {
+    padding: 20px;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.sheet-setup h2 {
+    margin-bottom: 8px;
+}
+
+.setup-intro {
+    color: var(--color-text-secondary);
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.setup-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.setup-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 20px;
+}
+
+.setup-card h3 {
+    margin-bottom: 8px;
+}
+
+.setup-card p {
+    color: var(--color-text-secondary);
+    font-size: 0.9em;
+    margin-bottom: 16px;
+}
+
+.setup-card .app-btn {
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 1em;
+}
+
+.setup-card .app-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.setup-habit-list {
+    list-style: none;
+    margin-bottom: 12px;
+}
+
+.setup-habit-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.9em;
+}
+
+.setup-add-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.setup-add-row input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-family: inherit;
+}
+
+.setup-add-row button {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    cursor: pointer;
+    color: var(--color-text);
+}
+
+.setup-add-row button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+    .habit-header h1 {
+        font-size: 1.2em;
+        margin: 0 10px;
+    }
+
+    .period-label {
+        min-width: 140px;
+    }
+
+    .habit-name-col {
+        min-width: 130px;
+    }
+}

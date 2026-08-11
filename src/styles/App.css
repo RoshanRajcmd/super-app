@@ -1,13 +1,33 @@
+/*
+ * Fallback palette. ThemeProvider overwrites these on :root at runtime from the
+ * user's saved theme; the values here are only what renders before that lands,
+ * and they match the default light theme so there is no visible swap.
+ */
 :root {
     --color-primary: #007bff;
+    --color-primary-strong: #0062cc;
+    --color-primary-soft: rgba(0, 0, 0, 0.04);
     --color-success: #28a745;
     --color-warning: #ffc107;
     --color-danger: #dc3545;
     --color-bg: #f5f7fa;
     --color-surface: #ffffff;
+    --color-surface-raised: #ffffff;
     --color-text: #212529;
     --color-text-secondary: #6c757d;
     --color-border: #e9ecef;
+    --color-error-bg: #f8d7da;
+    --color-error-text: #842029;
+    --color-error-border: #f5c2c7;
+    --color-warn-bg: #fff3cd;
+    --color-warn-text: #664d03;
+    --color-warn-border: #ffecb5;
+    --color-done-bg: #f2fbf4;
+    --heat-0: #e9ecef;
+    --heat-1: #9be9a8;
+    --heat-2: #40c463;
+    --heat-3: #30a14e;
+    --heat-4: #216e39;
     --radius: 8px;
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -22,6 +42,8 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background-color: var(--color-bg);
     color: var(--color-text);
+    /* Ease the swap when the theme changes, not just on first paint. */
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .app {
@@ -50,10 +72,21 @@ body {
 .home-header h1 {
     font-size: 3em;
     margin-bottom: 10px;
-    background: linear-gradient(135deg, #007bff, #0056b3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+}
+
+/* The clipped gradient makes text transparent, so the icon needs its own fill. */
+.home-logo {
+    color: var(--color-primary);
+    -webkit-text-fill-color: var(--color-primary);
+    flex-shrink: 0;
 }
 
 .home-header p {
@@ -86,12 +119,12 @@ body {
 @media (hover: hover) {
     .app-card:hover {
         transform: translateY(-8px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 8px 24px var(--color-shadow-strong, rgba(0, 0, 0, 0.15));
     }
 }
 
 .app-card:active {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 24px var(--color-shadow-strong, rgba(0, 0, 0, 0.15));
 }
 
 .app-icon {
@@ -123,7 +156,7 @@ body {
 }
 
 .app-btn:hover {
-    background: #0056b3;
+    background: var(--color-primary-strong);
 }
 
 .app-footer {
@@ -165,7 +198,7 @@ button {
 }
 
 .edit-btn:hover {
-    background: #0056b3;
+    background: var(--color-primary-strong);
 }
 
 .save-btn {
@@ -180,7 +213,7 @@ button {
 }
 
 .save-btn:hover:not(:disabled) {
-    background: #218838;
+    filter: brightness(0.9);
 }
 
 .save-btn:disabled {
@@ -199,7 +232,7 @@ button {
 }
 
 .cancel-btn:hover {
-    background: #dee2e6;
+    filter: brightness(0.95);
 }
 
 .delete-btn {
@@ -214,6 +247,157 @@ button {
 
 .delete-btn:hover {
     transform: scale(1.2);
+}
+
+/* Theme controls, pinned above every view */
+.theme-controls {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 12px);
+    right: calc(env(safe-area-inset-right) + 12px);
+    display: flex;
+    gap: 8px;
+    z-index: 50;
+}
+
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    font-size: 1.5em;
+    line-height: 1;
+    color: var(--color-text);
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.theme-toggle:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.theme-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 100;
+}
+
+.theme-panel {
+    width: 100%;
+    max-width: 420px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    padding: 20px;
+}
+
+.theme-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.theme-close {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 1em;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.theme-close:hover {
+    color: var(--color-danger);
+}
+
+.theme-section {
+    margin-bottom: 20px;
+}
+
+.theme-section h3 {
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    margin-bottom: 10px;
+}
+
+.theme-mode-row {
+    display: flex;
+    gap: 8px;
+}
+
+.theme-mode-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    font-size: 1em;
+    color: var(--color-text);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.theme-mode-btn.active {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.theme-swatch-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.theme-swatch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-text);
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: border-color 0.2s ease;
+}
+
+.theme-swatch.active {
+    border-color: var(--color-primary);
+}
+
+.swatch-chip {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+.theme-preview {
+    margin-top: 10px;
+    font-size: 0.85em;
 }
 
 /* Responsive: tablet */
