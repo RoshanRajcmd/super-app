@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import { FaSave, FaRegEdit } from "react-icons/fa";
+import { RiArrowGoBackFill } from "react-icons/ri";
 import { loadNote, saveNote } from "./utils/storage";
 import "./styles/NoteEditor.css";
 
@@ -13,18 +15,6 @@ export default function NoteEditor({ onBack }: NoteEditorProps) {
     const [note, setNote] = useState("");
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-
-    // Discard local edits and re-read the stored note. Also used by Cancel.
-    const refreshNote = useCallback(
-        () =>
-            loadNote()
-                .then(setNote)
-                .catch((error) => {
-                    console.error("Failed to load note:", error);
-                    setNote(FALLBACK_NOTE);
-                }),
-        []
-    );
 
     // Hydrate from the persistent store once on mount.
     useEffect(() => {
@@ -44,52 +34,66 @@ export default function NoteEditor({ onBack }: NoteEditorProps) {
         };
     }, []);
 
-    async function handleSave() {
+    /** Persist the note. Returns false if the write failed, so callers can stay put. */
+    async function persist(): Promise<boolean> {
         setIsSaving(true);
         try {
             await saveNote(note);
-            setIsEditing(false);
+            return true;
         } catch (error) {
             console.error("Failed to save note:", error);
             alert("Failed to save note");
+            return false;
         } finally {
             setIsSaving(false);
         }
     }
 
+    async function handleSave() {
+        if (await persist()) setIsEditing(false);
+    }
+
+    /**
+     * There is no discard path, so leaving always commits what is on screen.
+     * Saved unconditionally rather than on a dirty check: the write is cheap and
+     * it keeps the file the single source of truth once Drive sync is watching it.
+     */
+    async function handleBack() {
+        if (await persist()) onBack();
+    }
+
     return (
         <div className="note-editor">
             <div className="note-header">
-                <button className="back-btn" onClick={onBack}>
-                    ← Back
+                <button
+                    className="back-btn icon-btn"
+                    onClick={handleBack}
+                    disabled={isSaving}
+                    aria-label="Back"
+                    title="Back (saves)"
+                >
+                    <RiArrowGoBackFill aria-hidden />
                 </button>
                 <h1>📝 Note Editor</h1>
                 <div className="note-actions">
                     {isEditing ? (
-                        <>
-                            <button
-                                className="save-btn"
-                                onClick={handleSave}
-                                disabled={isSaving}
-                            >
-                                {isSaving ? "Saving..." : "Save"}
-                            </button>
-                            <button
-                                className="cancel-btn"
-                                onClick={() => {
-                                    setIsEditing(false);
-                                    refreshNote();
-                                }}
-                            >
-                                Cancel
-                            </button>
-                        </>
+                        <button
+                            className="save-btn icon-btn"
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            aria-label={isSaving ? "Saving" : "Save"}
+                            title={isSaving ? "Saving..." : "Save"}
+                        >
+                            <FaSave aria-hidden />
+                        </button>
                     ) : (
                         <button
-                            className="edit-btn"
+                            className="edit-btn icon-btn"
                             onClick={() => setIsEditing(true)}
+                            aria-label="Edit"
+                            title="Edit"
                         >
-                            Edit
+                            <FaRegEdit aria-hidden />
                         </button>
                     )}
                 </div>
