@@ -1,4 +1,5 @@
 mod habit_sheet;
+mod notes;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -11,6 +12,11 @@ pub fn run() {
       habit_sheet::habit_sheet_create,
       habit_sheet::habit_sheet_read,
       habit_sheet::habit_sheet_write,
+      notes::note_recents,
+      notes::note_pick,
+      notes::note_create,
+      notes::note_open,
+      notes::note_write,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

@@ -11,8 +11,6 @@
     justify-content: space-between;
     gap: 10px;
     padding: 20px;
-    /* Keep the title and actions clear of the fixed theme button (44px + gap). */
-    padding-right: 76px;
     background: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
     box-shadow: var(--shadow);
@@ -434,7 +432,6 @@
 @media (max-width: 480px) {
     .todo-header {
         padding: 12px;
-        padding-right: 68px;
         gap: 6px;
     }
 

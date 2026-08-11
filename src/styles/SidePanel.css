@@ -1,0 +1,179 @@
+/*
+ * The app switcher. Slides in from the left over whatever screen is showing, so
+ * it needs to sit above every view but below the theme dialog it opens.
+ */
+
+.side-panel-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 80;
+}
+
+.side-panel {
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+    max-width: 85vw;
+    height: 100%;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
+    /* Clear notches and the status bar, as the app shell does. */
+    padding: calc(env(safe-area-inset-top) + 12px) 12px
+        calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 12px);
+    animation: side-panel-in 0.18s ease-out;
+}
+
+@keyframes side-panel-in {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+/* Respect a reduced-motion preference: the panel still appears, just without the slide. */
+@media (prefers-reduced-motion: reduce) {
+    .side-panel {
+        animation: none;
+    }
+}
+
+.side-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 12px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.side-panel-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.side-panel-close {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius);
+    transition: color 0.2s ease, background 0.2s ease;
+}
+
+.side-panel-close:hover {
+    color: var(--color-primary);
+    background: var(--color-bg);
+}
+
+.side-panel-apps {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    /* Takes the slack so the settings row stays pinned to the bottom. */
+    flex: 1;
+    overflow-y: auto;
+}
+
+.side-panel-app {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px;
+    text-align: left;
+    font-size: 1em;
+    color: var(--color-text);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.side-panel-app:hover {
+    background: var(--color-bg);
+}
+
+.side-panel-app.active {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+}
+
+.side-panel-app-icon {
+    font-size: 1.4em;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.side-panel-app-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.side-panel-app-label {
+    font-weight: 600;
+}
+
+.side-panel-app-tagline {
+    font-size: 0.8em;
+    color: var(--color-text-secondary);
+}
+
+.side-panel-foot {
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+}
+
+.side-panel-settings {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    font-size: 0.95em;
+    color: var(--color-text-secondary);
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.side-panel-settings:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+/* The button that opens all of this, sitting in every screen's header. */
+.sidebar-btn {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius);
+    transition: color 0.2s ease, background 0.2s ease;
+}
+
+.sidebar-btn:hover {
+    color: var(--color-primary);
+    background: var(--color-bg);
+}
+
+@media (max-width: 480px) {
+    .side-panel-app,
+    .side-panel-settings {
+        min-height: 44px;
+    }
+}

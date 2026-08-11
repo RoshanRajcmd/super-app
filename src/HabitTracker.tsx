@@ -20,14 +20,12 @@ import {
     setMark,
     type HabitBook,
 } from "./utils/habitSheet";
-import { dayStats, perfectDayStreak, rangeStats } from "./utils/habitStats";
 import {
     daysInRange,
     formatDate,
     formatMonthYear,
     getIsoWeekRange,
     getMonthRange,
-    getYearRange,
     today,
 } from "./utils/dateUtils";
 import { isTauri } from "./utils/platform";
@@ -35,11 +33,15 @@ import { getStore } from "./utils/keyValueStore";
 import HabitDayView from "./components/HabitDayView";
 import HabitGrid from "./components/HabitGrid";
 import HabitHeatmap from "./components/HabitHeatmap";
-import HabitProgressBar from "./components/HabitProgressBar";
 import SheetSetup from "./components/SheetSetup";
+import SidebarButton from "./components/SidebarButton";
 import "./styles/HabitTracker.css";
 
 interface HabitTrackerProps {
+    /** Day to open on. Defaults to today. */
+    initialDate?: string;
+    /** View to open in. Defaults to the week grid. */
+    initialView?: HabitViewMode;
     onBack: () => void;
 }
 
@@ -53,14 +55,14 @@ const FROZEN_KEY = "habitColumnFrozen";
  * must round-trip byte-for-byte, so React re-renders off a cheap snapshot of the
  * readable part (`sheet`) that is replaced whenever the book changes.
  */
-export default function HabitTracker({ onBack }: HabitTrackerProps) {
+export default function HabitTracker({ initialDate, initialView, onBack }: HabitTrackerProps) {
     const book = useRef<HabitBook | null>(null);
     const mtime = useRef<number | null>(null);
 
     const [sheet, setSheet] = useState<HabitSheet | null>(null);
     const [sheetPath, setSheetPath] = useState<string | null>(null);
-    const [view, setView] = useState<HabitViewMode>("week");
-    const [selectedDate, setSelectedDate] = useState(today());
+    const [view, setView] = useState<HabitViewMode>(initialView ?? "week");
+    const [selectedDate, setSelectedDate] = useState(initialDate ?? today());
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -282,6 +284,7 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
         return (
             <div className="habit-tracker">
                 <div className="habit-header">
+                    <SidebarButton />
                     <button
                         className="back-btn icon-btn"
                         onClick={onBack}
@@ -302,6 +305,7 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
         return (
             <div className="habit-tracker">
                 <div className="habit-header">
+                    <SidebarButton />
                     <button
                         className="back-btn icon-btn"
                         onClick={onBack}
@@ -326,13 +330,6 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
 
     const week = getIsoWeekRange(selectedDate);
     const month = getMonthRange(selectedDate);
-    const year = getYearRange(selectedDate);
-
-    const weekStats = rangeStats(sheet, week.start, week.end);
-    const monthStats = rangeStats(sheet, month.start, month.end);
-    const yearStats = rangeStats(sheet, year.start, year.end);
-    const selectedDayStats = dayStats(sheet, selectedDate);
-    const streak = perfectDayStreak(sheet);
 
     /** Step the selected date by one unit of the active view. */
     function shift(direction: -1 | 1) {
@@ -352,6 +349,7 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
     return (
         <div className="habit-tracker">
             <div className="habit-header">
+                <SidebarButton />
                 <button
                     className="back-btn icon-btn"
                     onClick={onBack}
@@ -381,21 +379,6 @@ export default function HabitTracker({ onBack }: HabitTrackerProps) {
             )}
             {error && <div className="habit-error">{error}</div>}
             {warning && <div className="habit-warning">{warning}</div>}
-
-            <div className="habit-summary">
-                <HabitProgressBar
-                    label={view === "day" ? "Today" : "Selected day"}
-                    stats={selectedDayStats}
-                    prominent={view === "day"}
-                />
-                <HabitProgressBar label="Week" stats={weekStats} prominent={view === "week"} />
-                <HabitProgressBar label="Month" stats={monthStats} prominent={view === "month"} />
-                <HabitProgressBar label="Year" stats={yearStats} prominent={view === "year"} />
-                <div className="habit-streak">
-                    <span className="streak-value">{streak}</span>
-                    <span className="streak-label">🔥 day perfect streak</span>
-                </div>
-            </div>
 
             <div className="habit-controls">
                 <div className="view-switcher">

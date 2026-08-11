@@ -1,0 +1,182 @@
+/*
+ * Shared chrome for every sub-app's home page. `AppHome` owns this layout, so
+ * the three homes stay visually identical however different their contents are.
+ */
+
+.app-home {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 20px;
+    gap: 20px;
+}
+
+.app-home-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.app-home-title h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.8em;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* The clipped gradient makes text transparent, so the emoji needs its own fill. */
+.app-home-icon {
+    -webkit-text-fill-color: initial;
+    flex-shrink: 0;
+}
+
+.app-home-title p {
+    font-size: 0.95em;
+    color: var(--color-text-secondary);
+}
+
+.app-home-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+/* The primary actions carry icons, which the base .app-btn does not lay out. */
+.app-home-actions .app-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.app-home-actions .app-btn.secondary {
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+}
+
+.app-home-actions .app-btn.secondary:hover {
+    border-color: var(--color-primary);
+    background: var(--color-surface);
+    color: var(--color-primary);
+}
+
+.app-home-actions .app-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.app-home-body {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.home-section {
+    background: var(--color-surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+}
+
+.home-section h2 {
+    font-size: 1.15em;
+    margin-bottom: 16px;
+}
+
+.home-empty {
+    color: var(--color-text-secondary);
+    font-size: 0.95em;
+}
+
+.home-hint {
+    margin-top: 12px;
+    font-size: 0.85em;
+    color: var(--color-text-secondary);
+}
+
+.home-error {
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
+    border: 1px solid var(--color-error-border);
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 0.9em;
+}
+
+/* Recently opened notes */
+.note-recents {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    list-style: none;
+}
+
+.note-recent {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 12px;
+    text-align: left;
+    font-size: 1em;
+    color: var(--color-text);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.note-recent:hover {
+    border-color: var(--color-primary);
+}
+
+.note-recent-name {
+    font-weight: 500;
+    /* Long file names truncate rather than wrap, so rows keep one height. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.note-recent-meta {
+    font-size: 0.8em;
+    color: var(--color-text-secondary);
+    flex-shrink: 0;
+}
+
+/* The task home reuses ProgressTracker, which carries its own card styling from
+   TodoView.css. Drop the duplicate margin it assumed inside that screen. */
+.app-home-body .progress-tracker {
+    margin: 0;
+}
+
+@media (max-width: 480px) {
+    .app-home {
+        padding: 12px;
+        gap: 16px;
+    }
+
+    .app-home-title h1 {
+        font-size: 1.35em;
+    }
+
+    .app-home-actions .app-btn {
+        flex: 1;
+        justify-content: center;
+        min-height: 44px;
+    }
+
+    .note-recent {
+        /* Name over timestamp: side by side leaves neither enough room. */
+        flex-direction: column;
+        gap: 4px;
+        min-height: 44px;
+    }
+}

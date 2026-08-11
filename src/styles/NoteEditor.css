@@ -14,8 +14,6 @@
     justify-content: space-between;
     gap: 10px;
     padding: 20px;
-    /* Keep the title and actions clear of the fixed theme button (44px + gap). */
-    padding-right: 76px;
     background: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
     box-shadow: var(--shadow);
@@ -162,8 +160,19 @@
     font-weight: 600;
 }
 
+/* Save and load failures, and the reload notice after a conflict. */
+.note-error {
+    margin: 12px 20px 0;
+    padding: 12px;
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
+    border: 1px solid var(--color-error-border);
+    border-radius: var(--radius);
+    font-size: 0.9em;
+}
+
 @media (max-width: 768px) {
-    /* Header stays one row: back, title, actions. Only the title shrinks. */
+    /* Header stays one row: panel, back, title, actions. Only the title shrinks. */
     .note-header h1 {
         margin: 0;
         font-size: 1.15em;
@@ -173,7 +182,6 @@
 @media (max-width: 480px) {
     .note-header {
         padding: 12px;
-        padding-right: 68px;
         gap: 6px;
     }
 

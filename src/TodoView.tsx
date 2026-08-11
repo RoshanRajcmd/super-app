@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { MdAdd } from "react-icons/md";
 import { IoChevronBackCircle } from "react-icons/io5";
-import type { Task, DailyStats } from "./types";
+import type { Task } from "./types";
 import { loadTasks, saveTasks, updateDailyStats } from "./utils/storage";
 import { formatDate } from "./utils/dateUtils";
+import SidebarButton from "./components/SidebarButton";
 import TaskForm from "./components/TaskForm";
 import TaskList from "./components/TaskList";
-import ProgressTracker from "./components/ProgressTracker";
 import "./styles/TodoView.css";
 
 interface TodoViewProps {
@@ -16,7 +15,6 @@ interface TodoViewProps {
 
 export default function TodoView({ onBack }: TodoViewProps) {
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [stats, setStats] = useState<DailyStats[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [selectedDate, setSelectedDate] = useState(
         new Date().toISOString().split("T")[0]
@@ -31,10 +29,9 @@ export default function TodoView({ onBack }: TodoViewProps) {
             .then(async (loadedTasks) => {
                 if (!active) return;
                 setTasks(loadedTasks);
-
-                const loadedStats = await updateDailyStats(loadedTasks);
-                if (!active) return;
-                setStats(loadedStats);
+                // Nothing here renders the history, but the home page reads it,
+                // so today's row is kept current from the moment tasks load.
+                await updateDailyStats(loadedTasks);
             })
             .catch((error) => {
                 console.error("Failed to load tasks:", error);
@@ -56,8 +53,7 @@ export default function TodoView({ onBack }: TodoViewProps) {
         setTasks(updatedTasks);
         await saveTasks(updatedTasks);
 
-        const updatedStats = await updateDailyStats(updatedTasks);
-        setStats(updatedStats);
+        await updateDailyStats(updatedTasks);
         setShowForm(false);
     }
 
@@ -66,8 +62,7 @@ export default function TodoView({ onBack }: TodoViewProps) {
         setTasks(updatedTasks);
         await saveTasks(updatedTasks);
 
-        const updatedStats = await updateDailyStats(updatedTasks);
-        setStats(updatedStats);
+        await updateDailyStats(updatedTasks);
     }
 
     async function deleteTask(id: string) {
@@ -75,8 +70,7 @@ export default function TodoView({ onBack }: TodoViewProps) {
         setTasks(updatedTasks);
         await saveTasks(updatedTasks);
 
-        const updatedStats = await updateDailyStats(updatedTasks);
-        setStats(updatedStats);
+        await updateDailyStats(updatedTasks);
     }
 
     const todayTasks = tasks.filter((t) => t.date === selectedDate);
@@ -86,6 +80,7 @@ export default function TodoView({ onBack }: TodoViewProps) {
     return (
         <div className="todo-view">
             <div className="todo-header">
+                <SidebarButton />
                 <button
                     className="back-btn icon-btn"
                     onClick={onBack}
@@ -110,8 +105,6 @@ export default function TodoView({ onBack }: TodoViewProps) {
                     defaultDate={selectedDate}
                 />
             )}
-
-            <ProgressTracker stats={stats} selectedDate={selectedDate} />
 
             <div className="todo-container">
                 <div className="daily-section">
