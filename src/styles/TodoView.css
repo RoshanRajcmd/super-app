@@ -27,10 +27,8 @@
     background: var(--color-success);
     color: white;
     border: none;
-    padding: 10px 20px;
     border-radius: var(--radius);
     cursor: pointer;
-    font-size: 1em;
     transition: background 0.3s ease;
 }
 
@@ -452,11 +450,6 @@
 
     .form-group input,
     .date-selector input {
-        min-height: 44px;
-    }
-
-    /* Full width would break the header row, so keep it a square icon button. */
-    .add-task-btn {
         min-height: 44px;
     }
 

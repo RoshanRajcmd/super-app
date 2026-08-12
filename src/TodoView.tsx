@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { IoChevronBackCircle } from "react-icons/io5";
+import { FaPlus } from "react-icons/fa";
 import type { Task } from "./types";
 import { loadTasks, saveTasks, updateDailyStats } from "./utils/storage";
 import { formatDate } from "./utils/dateUtils";
@@ -89,12 +90,15 @@ export default function TodoView({ onBack }: TodoViewProps) {
                 >
                     <IoChevronBackCircle aria-hidden />
                 </button>
-                <h1>✓ Task Manager</h1>
+                <h1>✅ Task Manager</h1>
                 <button
-                    className="add-task-btn"
+                    className="add-task-btn icon-btn"
                     onClick={() => setShowForm(!showForm)}
+                    aria-label={showForm ? "Close the add task form" : "Add task"}
+                    aria-expanded={showForm}
+                    title={showForm ? "Close" : "Add task"}
                 >
-                    + Add Task
+                    <FaPlus aria-hidden />
                 </button>
             </div>
 

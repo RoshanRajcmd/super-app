@@ -117,10 +117,10 @@
 }
 
 .note-recent {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 2px 12px;
     width: 100%;
     padding: 12px;
     text-align: left;
@@ -145,10 +145,49 @@
     white-space: nowrap;
 }
 
+.note-recent-where {
+    grid-column: 1;
+    font-size: 0.78em;
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl;
+    text-align: left;
+}
+
 .note-recent-meta {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
     font-size: 0.8em;
     color: var(--color-text-secondary);
     flex-shrink: 0;
+}
+
+.note-setting-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.note-setting-actions .app-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.note-setting-actions .app-btn.secondary {
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+}
+
+.note-setting-actions .app-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* The task home reuses ProgressTracker, which carries its own card styling from
@@ -174,9 +213,19 @@
     }
 
     .note-recent {
-        /* Name over timestamp: side by side leaves neither enough room. */
-        flex-direction: column;
+        grid-template-columns: minmax(0, 1fr);
         gap: 4px;
+        min-height: 44px;
+    }
+
+    .note-recent-meta {
+        grid-column: 1;
+        grid-row: auto;
+    }
+
+    .note-setting-actions .app-btn {
+        flex: 1;
+        justify-content: center;
         min-height: 44px;
     }
 }
