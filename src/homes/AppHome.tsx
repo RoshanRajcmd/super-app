@@ -31,7 +31,6 @@ export default function AppHome({ app, actions, children }: AppHomeProps) {
                         </span>
                         {app.label}
                     </h1>
-                    <p>{app.tagline}</p>
                 </div>
             </header>
 

@@ -92,7 +92,7 @@ export default function NotesHome({ onOpen }: NotesHomeProps) {
                         onClick={() => (isTauri() ? handleBrowse() : fileInput.current?.click())}
                         disabled={busy}
                     >
-                        <FaFolderOpen aria-hidden /> Browse and open
+                        <FaFolderOpen aria-hidden /> Browse
                     </button>
                     <button className="app-btn secondary" onClick={handleNew} disabled={busy}>
                         <FaRegFileAlt aria-hidden /> New note

@@ -13,8 +13,6 @@ export interface AppDefinition {
     label: string;
     /** Emoji marker, matching the icons the screens already use. */
     icon: string;
-    /** One line under the home page title. */
-    tagline: string;
 }
 
 export const APPS: AppDefinition[] = [
@@ -22,19 +20,16 @@ export const APPS: AppDefinition[] = [
         id: "notes",
         label: "Note Editor",
         icon: "📝",
-        tagline: "Write and preview markdown notes",
     },
     {
         id: "tasks",
         label: "Task Manager",
-        icon: "✓",
-        tagline: "Track what needs doing, and how it is going",
+        icon: "✅",
     },
     {
         id: "habits",
         label: "Habit Tracker",
         icon: "🔥",
-        tagline: "Keep your daily routine on the board",
     },
 ];
 
