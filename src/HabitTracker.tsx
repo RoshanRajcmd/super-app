@@ -36,6 +36,8 @@ import HabitHeatmap from "./components/HabitHeatmap";
 import SheetSetup from "./components/SheetSetup";
 import SidebarButton from "./components/SidebarButton";
 import "./styles/HabitTracker.css";
+import { IoReload } from "react-icons/io5";
+import { CgExport, CgImport } from "react-icons/cg";
 
 interface HabitTrackerProps {
     /** Day to open on. Defaults to today. */
@@ -360,15 +362,15 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
                 </button>
                 <h1>🔥 Habit Tracker</h1>
                 <div className="habit-header-actions">
-                    {isTauri() ? (
-                        <button onClick={handleReload} disabled={busy}>
-                            Reload
-                        </button>
-                    ) : (
-                        <button onClick={handleExport} disabled={busy}>
-                            Export
-                        </button>
-                    )}
+                    <button onClick={handleOpen} disabled={busy}>
+                        <CgImport size="20px" aria-hidden />
+                    </button>
+                    <button onClick={handleReload} disabled={busy}>
+                        <IoReload size="20px" aria-hidden />
+                    </button>
+                    <button onClick={handleExport} disabled={busy}>
+                        <CgExport size="20px" aria-hidden />
+                    </button>
                 </div>
             </div>
 
