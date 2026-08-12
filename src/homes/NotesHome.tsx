@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { FaFolderOpen, FaRegFileAlt } from "react-icons/fa";
+import { FaFolderOpen } from "react-icons/fa";
+import { VscNewFile } from "react-icons/vsc";
 import AppHome from "./AppHome";
 import { appById } from "../nav/apps";
 import { isTauri } from "../utils/platform";
@@ -92,10 +93,10 @@ export default function NotesHome({ onOpen }: NotesHomeProps) {
                         onClick={() => (isTauri() ? handleBrowse() : fileInput.current?.click())}
                         disabled={busy}
                     >
-                        <FaFolderOpen aria-hidden /> Browse
+                        <FaFolderOpen size="20px" aria-hidden /> Browse
                     </button>
                     <button className="app-btn secondary" onClick={handleNew} disabled={busy}>
-                        <FaRegFileAlt aria-hidden /> New note
+                        <VscNewFile size="20px" aria-hidden /> New note
                     </button>
                     {!isTauri() && (
                         <input
