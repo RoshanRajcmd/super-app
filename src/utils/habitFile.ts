@@ -88,15 +88,38 @@ export async function currentSheet(): Promise<SheetHandle | null> {
 }
 
 /**
- * Ask the user to pick an existing `.csv`.
+ * Read a file the user chose through an `<input type="file">`.
  *
- * Returns `null` if they cancel. In the browser the caller supplies the bytes
- * from a file input, since there is no OS picker to reach for.
+ * `arrayBuffer()` is missing on the File implementations some Android and older
+ * iOS webviews ship, and on anything handed over as a Blob-like object, so fall
+ * back to FileReader rather than failing the import.
+ */
+async function readFileBytes(file: File): Promise<Uint8Array> {
+    if (typeof file.arrayBuffer === "function") {
+        return new Uint8Array(await file.arrayBuffer());
+    }
+
+    const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error ?? new Error("could not read that file"));
+        reader.readAsArrayBuffer(file);
+    });
+    return new Uint8Array(buffer);
+}
+
+/**
+ * Ask the user to pick an existing `.csv`, which becomes the sheet the tracker
+ * reads and writes from here on.
+ *
+ * Returns `null` if they cancel. On Tauri the OS picker supplies a real path; in
+ * the browser there is none, so the caller passes the `File` from an input and
+ * the bytes are copied into the key/value store.
  */
 export async function pickSheet(browserFile?: File): Promise<SheetHandle | null> {
     if (!isTauri()) {
         if (!browserFile) return null;
-        const bytes = new Uint8Array(await browserFile.arrayBuffer());
+        const bytes = await readFileBytes(browserFile);
         await getStore().set(BROWSER_DATA_KEY, encode(bytes));
         await getStore().set(BROWSER_NAME_KEY, browserFile.name);
         return { path: browserFile.name, bytes, mtime: null };
@@ -159,8 +182,22 @@ export async function saveSheet(bytes: Uint8Array, expectedMtime: number | null)
     }
 }
 
-/** Download the CSV file, the browser's stand-in for having a real file. */
-export function downloadSheet(bytes: Uint8Array, fileName: string): void {
+/**
+ * Save a copy of the sheet somewhere of the user's choosing, leaving the tracked
+ * file as it is.
+ *
+ * On Tauri that is an OS save dialog, since a webview cannot start a download;
+ * in the browser it is a download, there being no filesystem to write to.
+ * Returns the path written on Tauri, and `null` in the browser or on cancel.
+ */
+export async function exportSheet(bytes: Uint8Array, fileName: string): Promise<string | null> {
+    if (isTauri()) {
+        return await invokeTauri<string | null>("habit_sheet_export", {
+            data: encode(bytes),
+            suggestedName: fileName,
+        });
+    }
+
     // Copy into a fresh buffer: the view may sit inside a larger ArrayBuffer.
     const blob = new Blob([bytes.slice()], {
         type: "text/csv;charset=utf-8",
@@ -171,4 +208,5 @@ export function downloadSheet(bytes: Uint8Array, fileName: string): void {
     link.download = fileName;
     link.click();
     URL.revokeObjectURL(url);
+    return null;
 }

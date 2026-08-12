@@ -57,7 +57,6 @@ export default function SidePanel() {
                             </span>
                             <span className="side-panel-app-text">
                                 <span className="side-panel-app-label">{app.label}</span>
-                                <span className="side-panel-app-tagline">{app.tagline}</span>
                             </span>
                         </button>
                     ))}

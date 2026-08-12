@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { FaSave, FaRegEdit, FaDownload } from "react-icons/fa";
+import { FaSave, FaRegEdit } from "react-icons/fa";
 import { IoChevronBackCircle } from "react-icons/io5";
 import SidebarButton from "./components/SidebarButton";
-import { isTauri } from "./utils/platform";
 import {
     NoteConflictError,
-    downloadNote,
     openNote,
     saveNoteTo,
     type NoteSource,
@@ -116,20 +114,8 @@ export default function NoteEditor({ source, onBack }: NoteEditorProps) {
                 >
                     <IoChevronBackCircle aria-hidden />
                 </button>
-                <h1 title={source.kind === "file" ? source.path : title}>📝 {title}</h1>
+                <h1 title={source.kind === "file" ? source.path : title}>{title}</h1>
                 <div className="note-actions">
-                    {/* Browser notes live in local storage, so a download is the
-                        only way out to a real file. */}
-                    {!isTauri() && (
-                        <button
-                            className="export-btn icon-btn"
-                            onClick={() => downloadNote(note, title)}
-                            aria-label="Download"
-                            title="Download a copy"
-                        >
-                            <FaDownload aria-hidden />
-                        </button>
-                    )}
                     {isEditing ? (
                         <button
                             className="save-btn icon-btn"

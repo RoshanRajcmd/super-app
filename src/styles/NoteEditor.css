@@ -19,11 +19,17 @@
     box-shadow: var(--shadow);
 }
 
+/* Small enough that a full file name fits, and allowed to wrap over a second
+   line rather than truncate: the name is how the user knows which note is open,
+   so seeing all of it matters more than a fixed header height. */
 .note-header h1 {
     flex: 1;
     min-width: 0;
     margin: 0 10px;
-    font-size: 1.5em;
+    font-size: 1.05em;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
 }
 
 .note-actions {
@@ -175,7 +181,7 @@
     /* Header stays one row: panel, back, title, actions. Only the title shrinks. */
     .note-header h1 {
         margin: 0;
-        font-size: 1.15em;
+        font-size: 1em;
     }
 }
 
@@ -186,11 +192,7 @@
     }
 
     .note-header h1 {
-        font-size: 1.1em;
-        /* Truncate rather than wrap, so the row height stays fixed. */
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        font-size: 0.95em;
     }
 
     .note-content {

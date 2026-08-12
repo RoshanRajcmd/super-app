@@ -35,8 +35,34 @@ const PROGRESS_LABEL = "Daily Progress %";
 /** Where the progress row is written when the sheet has none. */
 const PROGRESS_ROW_INDEX = 1;
 
-/** Header formats accepted when reading a sheet that was not created by us. */
-const HEADER_FORMATS = [ISO_DAY, "YYYY/MM/DD", "DD-MM-YYYY", "DD/MM/YYYY", "MMM D", "D MMM", "MMMM D"];
+/**
+ * Header formats accepted when reading a sheet that was not created by us.
+ *
+ * Excel and Google Sheets write day columns in whichever of these the locale
+ * favours — "2-Jan" is what a UK/Indian locale produces — so all of them are
+ * tried before a header is given up on as not a date.
+ */
+const HEADER_FORMATS = [
+    ISO_DAY,
+    "YYYY/MM/DD",
+    "DD-MM-YYYY",
+    "DD/MM/YYYY",
+    "D-M-YYYY",
+    "D/M/YYYY",
+    "D-MMM-YYYY",
+    "D MMM YYYY",
+    "DD-MMM-YYYY",
+    "MMM D YYYY",
+    "MMM D, YYYY",
+    "MMMM D YYYY",
+    "MMMM D, YYYY",
+    "MMM D",
+    "MMM-D",
+    "D MMM",
+    "D-MMM",
+    "MMMM D",
+    "D-MMMM",
+];
 /** Of those, the ones that pin down a year on their own. */
 const DATED_FORMATS = HEADER_FORMATS.filter((f) => f.includes("YYYY"));
 
@@ -128,6 +154,80 @@ function parseCsv(text: string): string[][] {
     if (field !== "" || row.length > 0) endRow();
 
     return rows;
+}
+
+/**
+ * Decode sheet bytes to text, working out the encoding first.
+ *
+ * A habit sheet is edited in Excel, Numbers and Google Sheets between visits,
+ * and those write more than one encoding: UTF-8 with or without a byte-order
+ * mark, UTF-16 for Excel's "Unicode Text", and a legacy single-byte page for
+ * older "Save as CSV". Guessing wrong turns emoji in habit names into runs of
+ * unrelated symbols, so the mark is honoured when present and UTF-8 is verified
+ * strictly before being trusted.
+ */
+function decodeCsvBytes(bytes: Uint8Array): string {
+    if (bytes.length >= 2) {
+        if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder("utf-16le").decode(bytes);
+        if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder("utf-16be").decode(bytes);
+    }
+
+    try {
+        // Fatal, so invalid sequences throw rather than becoming U+FFFD and
+        // silently losing the habit name they were part of.
+        return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+        // Not UTF-8 at all: a legacy single-byte export. windows-1252 covers the
+        // punctuation those files carry that latin1 leaves undefined.
+        return new TextDecoder("windows-1252").decode(bytes);
+    }
+}
+
+/** True when every character fits in one byte, i.e. nothing above U+00FF. */
+function isAllSingleByte(text: string): boolean {
+    for (let i = 0; i < text.length; i++) {
+        if (text.charCodeAt(i) > 0xff) return false;
+    }
+    return true;
+}
+
+/**
+ * True when `text` holds a UTF-8 lead byte followed by a continuation byte, read
+ * as single-byte characters. Without this check plain ASCII would be re-decoded
+ * for nothing.
+ */
+function looksLikeUtf8Pair(text: string): boolean {
+    for (let i = 0; i < text.length - 1; i++) {
+        const lead = text.charCodeAt(i);
+        const next = text.charCodeAt(i + 1);
+        if (lead >= 0xc2 && lead <= 0xf4 && next >= 0x80 && next <= 0xbf) return true;
+    }
+    return false;
+}
+
+/**
+ * Undo a UTF-8 file that some earlier tool read as a single-byte encoding, which
+ * is what leaves an emoji looking like "ð¥".
+ *
+ * Only attempted when every character is in the single-byte range: correctly
+ * decoded text containing emoji has characters above U+00FF, so a healthy sheet
+ * can never be touched by this. The repair is kept only if the bytes it implies
+ * are valid UTF-8 that actually decodes to something outside that range.
+ */
+function repairMojibake(text: string): string {
+    if (!isAllSingleByte(text)) return text;
+    if (!looksLikeUtf8Pair(text)) return text;
+
+    const bytes = new Uint8Array(text.length);
+    for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+
+    try {
+        const repaired = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+        // Kept only if it actually yields characters the mojibake was hiding.
+        return isAllSingleByte(repaired) ? text : repaired;
+    } catch {
+        return text;
+    }
 }
 
 function quoteField(value: string): string {
@@ -240,7 +340,7 @@ function inferYear(header: string[], skipColumn: number | null, preferredYear: n
  * one; headers that do state a year win.
  */
 export function parseHabitBook(bytes: Uint8Array, preferredYear: number): HabitBook {
-    const grid = parseCsv(new TextDecoder("utf-8").decode(bytes));
+    const grid = parseCsv(repairMojibake(decodeCsvBytes(bytes)));
     if (grid.length === 0) {
         throw new Error("This CSV file is empty.");
     }

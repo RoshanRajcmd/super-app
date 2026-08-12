@@ -12,9 +12,13 @@ pub fn run() {
       habit_sheet::habit_sheet_create,
       habit_sheet::habit_sheet_read,
       habit_sheet::habit_sheet_write,
+      habit_sheet::habit_sheet_export,
       notes::note_recents,
       notes::note_pick,
       notes::note_create,
+      notes::note_default_dir,
+      notes::note_pick_default_dir,
+      notes::note_clear_default_dir,
       notes::note_open,
       notes::note_write,
     ])

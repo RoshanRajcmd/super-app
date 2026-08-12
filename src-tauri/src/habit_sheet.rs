@@ -157,6 +157,50 @@ pub async fn habit_sheet_create(app: AppHandle, suggested_name: String) -> Resul
     load(path).map(Some)
 }
 
+/// Write a copy of the sheet wherever the user chooses, leaving the tracked
+/// file alone.
+///
+/// This is the desktop half of Export: the webview cannot trigger a browser
+/// download, so the bytes are handed to the OS save dialog instead. Returns the
+/// path written, or `None` if the user cancels.
+#[tauri::command]
+pub async fn habit_sheet_export(
+    app: AppHandle,
+    data: String,
+    suggested_name: String,
+) -> Result<Option<String>, String> {
+    let bytes = BASE64
+        .decode(data.as_bytes())
+        .map_err(|e| format!("malformed sheet payload: {e}"))?;
+
+    // Strip any separators the frontend may have sent, so the suggestion cannot
+    // walk out of the directory the user picks.
+    let safe_name = Path::new(&suggested_name)
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "habits.csv".to_string());
+
+    let picked = app
+        .dialog()
+        .file()
+        .add_filter("CSV spreadsheet", &["csv"])
+        .set_file_name(&safe_name)
+        .blocking_save_file();
+
+    let Some(picked) = picked else {
+        return Ok(None);
+    };
+    let mut path = picked
+        .into_path()
+        .map_err(|e| format!("unsupported file location: {e}"))?;
+    if path.extension().is_none() {
+        path.set_extension("csv");
+    }
+
+    fs::write(&path, &bytes).map_err(|e| format!("cannot write copy: {e}"))?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
 /// Re-read the remembered sheet from disk.
 #[tauri::command]
 pub fn habit_sheet_read(app: AppHandle) -> Result<SheetPayload, String> {

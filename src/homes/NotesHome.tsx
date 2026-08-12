@@ -6,7 +6,10 @@ import AppHome from "./AppHome";
 import { appById } from "../nav/apps";
 import { isTauri } from "../utils/platform";
 import {
+    clearDefaultNoteDir,
     createNote,
+    defaultNoteDir,
+    pickDefaultNoteDir,
     pickNote,
     recentNotes,
     sourceId,
@@ -24,6 +27,8 @@ export default function NotesHome({ onOpen }: NotesHomeProps) {
     const [recents, setRecents] = useState<NoteEntry[]>([]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    /** Folder new notes go into, or `null` while the user is asked each time. */
+    const [defaultDir, setDefaultDir] = useState<string | null>(null);
     const fileInput = useRef<HTMLInputElement>(null);
 
     const refresh = useCallback(async () => {
@@ -47,6 +52,14 @@ export default function NotesHome({ onOpen }: NotesHomeProps) {
             .catch((e) => {
                 if (active) setError(`Couldn't list your recent notes: ${String(e)}`);
             });
+
+        // The setting only affects new notes, so a failure to read it is not
+        // worth an error banner — the save dialog just asks where instead.
+        defaultNoteDir()
+            .then((dir) => {
+                if (active) setDefaultDir(dir);
+            })
+            .catch((e) => console.error("Failed to read the default note folder:", e));
 
         return () => {
             active = false;
@@ -78,6 +91,35 @@ export default function NotesHome({ onOpen }: NotesHomeProps) {
             onOpen(handle.source);
         } catch (e) {
             setError(`Couldn't create that note: ${String(e)}`);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    /** Choose the folder new notes are created in from now on. */
+    async function handlePickDefaultDir() {
+        setBusy(true);
+        setError(null);
+        try {
+            const dir = await pickDefaultNoteDir();
+            // `null` means they cancelled, so the existing setting stands.
+            if (dir !== null) setDefaultDir(dir);
+        } catch (e) {
+            setError(`Couldn't set that folder: ${String(e)}`);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    /** Go back to being asked where each new note should go. */
+    async function handleClearDefaultDir() {
+        setBusy(true);
+        setError(null);
+        try {
+            await clearDefaultNoteDir();
+            setDefaultDir(null);
+        } catch (e) {
+            setError(`Couldn't clear that folder: ${String(e)}`);
         } finally {
             setBusy(false);
         }
@@ -126,28 +168,80 @@ export default function NotesHome({ onOpen }: NotesHomeProps) {
                             : "No notes yet. Import a .md file, or start a new one — in the browser they are kept in local storage."}
                     </p>
                 ) : (
-                    <ul className="note-recents">
-                        {recents.map((entry) => (
-                            <li key={sourceId(entry.source)}>
-                                <button
-                                    className="note-recent"
-                                    onClick={() => onOpen(entry.source)}
-                                    title={entry.source.kind === "file" ? entry.source.path : entry.name}
-                                >
-                                    <span className="note-recent-name">{entry.name}</span>
-                                    <span className="note-recent-meta">
-                                        {entry.mtime === null
-                                            ? entry.source.kind === "store"
-                                                ? "In app storage"
-                                                : ""
-                                            : `Edited ${dayjs(entry.mtime).format("MMM D, HH:mm")}`}
-                                    </span>
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
+                    <>
+                        <ul className="note-recents">
+                            {recents.map((entry) => (
+                                <li key={sourceId(entry.source)}>
+                                    <button
+                                        className="note-recent"
+                                        onClick={() => onOpen(entry.source)}
+                                        title={
+                                            entry.source.kind === "file"
+                                                ? entry.source.path
+                                                : entry.name
+                                        }
+                                    >
+                                        <span className="note-recent-name">{entry.name}</span>
+                                        {/* Where the note lives: the full path for a
+                                            real file, so two notes with the same name
+                                            are told apart. A store-backed note has no
+                                            path to show — in the browser the picked
+                                            file was copied in, and the browser does
+                                            not reveal where it came from. */}
+                                        <span className="note-recent-where">
+                                            {entry.source.kind === "file"
+                                                ? entry.source.path
+                                                : "In app storage"}
+                                        </span>
+                                        <span className="note-recent-meta">
+                                            {entry.mtime === null
+                                                ? ""
+                                                : `Edited ${dayjs(entry.mtime).format("MMM D, HH:mm")}`}
+                                        </span>
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                        {/* Desktop rows carry the file's path. The browser cannot:
+                            a picked file exposes its name and nothing else, so notes
+                            are copied into app storage and edits stay there. */}
+                        {!isTauri() && (
+                            <p className="home-hint">
+                                In the browser, notes are copied into app storage —
+                                your edits do not reach the file you imported. Use the
+                                desktop app to edit files in place.
+                            </p>
+                        )}
+                    </>
                 )}
             </section>
+
+            {/* Browser notes have no folder, so the setting is desktop-only. */}
+            {isTauri() && (
+                <section className="home-section">
+                    <h2>New note location</h2>
+                    <p className="home-empty">
+                        {defaultDir === null
+                            ? "You are asked where to save each new note. Pick a folder to skip that."
+                            : `New notes are saved in ${defaultDir}`}
+                    </p>
+                    <div className="note-setting-actions">
+                        <button className="app-btn" onClick={handlePickDefaultDir} disabled={busy}>
+                            <FaFolderOpen size="20px" aria-hidden />{" "}
+                            {defaultDir === null ? "Choose folder" : "Change folder"}
+                        </button>
+                        {defaultDir !== null && (
+                            <button
+                                className="app-btn secondary"
+                                onClick={handleClearDefaultDir}
+                                disabled={busy}
+                            >
+                                Ask each time
+                            </button>
+                        )}
+                    </div>
+                </section>
+            )}
         </AppHome>
     );
 }

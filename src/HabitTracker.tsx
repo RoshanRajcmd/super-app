@@ -6,7 +6,7 @@ import {
     SheetConflictError,
     createSheetLocation,
     currentSheet,
-    downloadSheet,
+    exportSheet,
     pickSheet,
     reloadSheet,
     saveSheet,
@@ -71,6 +71,8 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
     const [warning, setWarning] = useState<string | null>(null);
     const [newHabit, setNewHabit] = useState("");
     const [frozen, setFrozen] = useState(true);
+    /** Drives the browser's import, which needs a real file input to click. */
+    const fileInput = useRef<HTMLInputElement>(null);
 
     /** Publish a fresh snapshot so React re-renders after mutating the book. */
     const syncFromBook = useCallback(() => {
@@ -272,14 +274,27 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
     }
 
     /**
-     * Download a copy of the sheet. Browser-only: saves there go to browser
-     * storage, so this is the only way out to a real file. On desktop the picked
-     * CSV is already the source of truth.
+     * Save a copy of the sheet elsewhere: a save dialog on desktop, a download in
+     * the browser. Offered on both, so a backup or a copy for another device is
+     * always one click away wherever the tracked sheet happens to live.
      */
-    function handleExport() {
+    async function handleExport() {
         const current = book.current;
         if (!current) return;
-        downloadSheet(serializeHabitBook(current), `habits-${current.sheet.year}.csv`);
+
+        setBusy(true);
+        try {
+            const written = await exportSheet(
+                serializeHabitBook(current),
+                `habits-${current.sheet.year}.csv`
+            );
+            setError(null);
+            setWarning(written === null ? null : `Copy saved to ${written}`);
+        } catch (e) {
+            setError(`Couldn't export: ${String(e)}`);
+        } finally {
+            setBusy(false);
+        }
     }
 
     if (loading) {
@@ -362,15 +377,45 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
                 </button>
                 <h1>🔥 Habit Tracker</h1>
                 <div className="habit-header-actions">
-                    <button onClick={handleOpen} disabled={busy}>
+                    <button
+                        onClick={() => (isTauri() ? handleOpen() : fileInput.current?.click())}
+                        disabled={busy}
+                        aria-label="Import"
+                        title="Import a .csv"
+                    >
                         <CgImport size="20px" aria-hidden />
                     </button>
-                    <button onClick={handleReload} disabled={busy}>
+                    <button
+                        onClick={handleReload}
+                        disabled={busy}
+                        aria-label="Reload"
+                        title="Reload from the file"
+                    >
                         <IoReload size="20px" aria-hidden />
                     </button>
-                    <button onClick={handleExport} disabled={busy}>
+                    <button
+                        onClick={handleExport}
+                        disabled={busy}
+                        aria-label="Export"
+                        title="Save a copy"
+                    >
                         <CgExport size="20px" aria-hidden />
                     </button>
+                    {/* The browser has no OS picker, so the import button drives
+                        this instead. */}
+                    {!isTauri() && (
+                        <input
+                            ref={fileInput}
+                            type="file"
+                            accept=".csv,text/csv"
+                            hidden
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleOpen(file);
+                                e.target.value = "";
+                            }}
+                        />
+                    )}
                 </div>
             </div>
 

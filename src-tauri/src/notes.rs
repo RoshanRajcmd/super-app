@@ -18,6 +18,8 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::DialogExt;
 
 const RECENTS_FILE: &str = "note-recents.json";
+/// Holds the folder new notes are created in, when the user has chosen one.
+const DEFAULT_DIR_FILE: &str = "note-default-dir.txt";
 
 /// How many notes to remember. Enough to cover "the ones I'm working on"
 /// without the home page list needing to scroll far.
@@ -55,6 +57,35 @@ fn recents_path(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| format!("no app data dir: {e}"))?;
     fs::create_dir_all(&dir).map_err(|e| format!("cannot create app data dir: {e}"))?;
     Ok(dir.join(RECENTS_FILE))
+}
+
+fn default_dir_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("no app data dir: {e}"))?;
+    fs::create_dir_all(&dir).map_err(|e| format!("cannot create app data dir: {e}"))?;
+    Ok(dir.join(DEFAULT_DIR_FILE))
+}
+
+/// The folder new notes go into, or `None` while the user has not picked one.
+///
+/// A folder that has since been deleted is reported as unset, so the caller
+/// falls back to asking where to save rather than failing.
+fn read_default_dir(app: &AppHandle) -> Result<Option<PathBuf>, String> {
+    let pointer = default_dir_path(app)?;
+    match fs::read_to_string(&pointer) {
+        Ok(raw) => {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return Ok(None);
+            }
+            let dir = PathBuf::from(trimmed);
+            Ok(if dir.is_dir() { Some(dir) } else { None })
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("cannot read default note folder: {e}")),
+    }
 }
 
 fn file_name(path: &Path) -> String {
@@ -188,10 +219,64 @@ pub async fn note_pick(app: AppHandle) -> Result<Option<NotePayload>, String> {
     load(path).map(Some)
 }
 
-/// Choose where to create a new note and remember it.
+/// The folder new notes are saved into, or `None` while none is set.
+#[tauri::command]
+pub fn note_default_dir(app: AppHandle) -> Result<Option<String>, String> {
+    Ok(read_default_dir(&app)?.map(|d| d.to_string_lossy().into_owned()))
+}
+
+/// Ask the user to pick the folder new notes should go into, and remember it.
 ///
-/// The file itself is not created here; the frontend follows up with a save once
-/// the user has typed something. Returns `None` if they cancel.
+/// Returns the chosen folder, or `None` if they cancel.
+#[tauri::command]
+pub async fn note_pick_default_dir(app: AppHandle) -> Result<Option<String>, String> {
+    let Some(picked) = app.dialog().file().blocking_pick_folder() else {
+        return Ok(None);
+    };
+    let dir = picked
+        .into_path()
+        .map_err(|e| format!("unsupported folder location: {e}"))?;
+
+    let pointer = default_dir_path(&app)?;
+    fs::write(&pointer, dir.to_string_lossy().as_bytes())
+        .map_err(|e| format!("cannot save default note folder: {e}"))?;
+
+    Ok(Some(dir.to_string_lossy().into_owned()))
+}
+
+/// Forget the default folder, so new notes ask where to go again.
+#[tauri::command]
+pub fn note_clear_default_dir(app: AppHandle) -> Result<(), String> {
+    let pointer = default_dir_path(&app)?;
+    match fs::remove_file(&pointer) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("cannot clear default note folder: {e}")),
+    }
+}
+
+/// A path in `dir` named `stem.md` that no file already occupies, so creating
+/// two notes on the same day does not have the second overwrite the first.
+fn free_path(dir: &Path, stem: &str) -> PathBuf {
+    let first = dir.join(format!("{stem}.md"));
+    if !first.exists() {
+        return first;
+    }
+    for n in 2.. {
+        let candidate = dir.join(format!("{stem} ({n}).md"));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    unreachable!()
+}
+
+/// Create a new note and remember it.
+///
+/// With a default folder set the note goes straight there under
+/// `suggested_name`; otherwise the OS save dialog asks where. Either way the
+/// file itself is not written here — the frontend follows up with a save once
+/// the user has typed something. Returns `None` if they cancel the dialog.
 #[tauri::command]
 pub async fn note_create(app: AppHandle, suggested_name: String) -> Result<Option<NotePayload>, String> {
     // The dialog supplies the real name, but strip any separators the frontend
@@ -200,6 +285,17 @@ pub async fn note_create(app: AppHandle, suggested_name: String) -> Result<Optio
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "note.md".to_string());
+
+    // A default folder is a standing answer to "where?", so skip the dialog.
+    if let Some(dir) = read_default_dir(&app)? {
+        let stem = Path::new(&safe_name)
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "note".to_string());
+        let path = free_path(&dir, &stem);
+        remember(&app, &path)?;
+        return load(path).map(Some);
+    }
 
     let picked = app
         .dialog()

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MdCancel } from "react-icons/md";
 import type { Task } from "../types";
+import { FaPlus } from "react-icons/fa";
 
 interface TaskFormProps {
     onAdd: (task: Omit<Task, "id" | "createdAt">) => void;
@@ -105,8 +106,8 @@ export default function TaskForm({ onAdd, onCancel, defaultDate }: TaskFormProps
             </div>
 
             <div className="form-actions">
-                <button type="submit" className="submit-btn">
-                    Add Task
+                <button type="submit" className="add-task-btn icon-btn">
+                    <FaPlus/>
                 </button>
                 <button
                     type="button"

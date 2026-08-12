@@ -7,11 +7,10 @@ import { getStore } from "./keyValueStore";
  *
  * On Tauri a note is a real `.md` the user picks or creates once; the path is
  * remembered by the Rust side, which also refuses to touch any path the user has
- * not chosen through a dialog. So the webview cannot aim note I/O at an
- * arbitrary file.
+ * not chosen through a dialog or created under the folder they nominated. So the
+ * webview cannot aim note I/O at an arbitrary file.
  *
- * In a plain browser there is no such file, so notes live in the key/value store
- * and the user exports one by download.
+ * In a plain browser there is no such file, so notes live in the key/value store.
  */
 
 /** Key holding the browser's note bodies, as a name-keyed map. */
@@ -109,8 +108,11 @@ async function rememberBrowser(name: string): Promise<void> {
 }
 
 /**
- * A name not already taken by another note, so importing two files called
- * `notes.md` does not have the second silently replace the first.
+ * A name no note is using yet, so creating two notes on the same day does not
+ * have the second silently replace the first.
+ *
+ * Only for notes the app names itself. An imported file keeps the name it came
+ * with — see `pickNote`.
  */
 function uniqueName(name: string, taken: Iterable<string>): string {
     const existing = new Set(taken);
@@ -183,9 +185,12 @@ export async function pickNote(browserFile?: File): Promise<NoteHandle | null> {
     if (!isTauri()) {
         if (!browserFile) return null;
 
+        // The file name is the identity: re-importing a file the user already
+        // imported refreshes that note rather than making a second copy under a
+        // suffixed name. On Tauri the path plays the same role.
+        const name = browserFile.name;
         const content = await browserFile.text();
         const notes = await readBrowserNotes();
-        const name = uniqueName(browserFile.name, Object.keys(notes));
 
         await getStore().set(BROWSER_NOTES_KEY, { ...notes, [name]: content });
         await rememberBrowser(name);
@@ -268,13 +273,28 @@ export async function saveNoteTo(
     }
 }
 
-/** Download a note, the browser's stand-in for having a real file. */
-export function downloadNote(content: string, fileName: string): void {
-    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName.endsWith(".md") ? fileName : `${fileName}.md`;
-    link.click();
-    URL.revokeObjectURL(url);
+/**
+ * The folder new notes are created in, or `null` while none is set.
+ *
+ * Browser-only notes have no folder to speak of, so this is always `null` there.
+ */
+export async function defaultNoteDir(): Promise<string | null> {
+    if (!isTauri()) return null;
+    return await invokeTauri<string | null>("note_default_dir");
+}
+
+/**
+ * Ask the user which folder new notes should go into.
+ *
+ * Returns the chosen folder, or `null` if they cancel.
+ */
+export async function pickDefaultNoteDir(): Promise<string | null> {
+    if (!isTauri()) return null;
+    return await invokeTauri<string | null>("note_pick_default_dir");
+}
+
+/** Forget the default folder, so creating a note asks where to put it again. */
+export async function clearDefaultNoteDir(): Promise<void> {
+    if (!isTauri()) return;
+    await invokeTauri<null>("note_clear_default_dir");
 }
