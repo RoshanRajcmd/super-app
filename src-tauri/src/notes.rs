@@ -263,6 +263,11 @@ pub fn note_default_dir(app: AppHandle) -> Result<Option<String>, String> {
 /// Ask the user to pick the folder new notes should go into, and remember it.
 ///
 /// Returns the chosen folder, or `None` if they cancel.
+///
+/// Desktop only. The dialog plugin gates folder picking behind `cfg(desktop)`
+/// because Android and iOS have no folder picker to offer — the mobile build gets
+/// the stub below, and reaches the setting by typing a path instead.
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn note_pick_default_dir(app: AppHandle) -> Result<Option<String>, String> {
     let Some(picked) = app.dialog().file().blocking_pick_folder() else {
@@ -280,6 +285,16 @@ pub async fn note_pick_default_dir(app: AppHandle) -> Result<Option<String>, Str
         .map_err(|e| format!("cannot save default note folder: {e}"))?;
 
     Ok(Some(dir.to_string_lossy().into_owned()))
+}
+
+/// Stands in for the folder picker on mobile, which has none.
+///
+/// The command still has to exist: it is registered in the handler either way, and
+/// the frontend only hides the button that calls it.
+#[cfg(not(desktop))]
+#[tauri::command]
+pub async fn note_pick_default_dir(_app: AppHandle) -> Result<Option<String>, String> {
+    Err("this platform has no folder picker — set the folder by typing its path instead".to_string())
 }
 
 /// Point new notes at a folder the user typed in.
