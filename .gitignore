@@ -15,8 +15,15 @@ build
 
 # Tauri
 src-tauri/target
-# Generated native projects (recreate with `npm run android:init` / `ios:init`)
-src-tauri/gen
+# Generated iOS project (recreate with `npm run ios:init`)
+src-tauri/gen/apple
+# The Android project is tracked, not generated on demand: its manifest carries a
+# hand-added storage permission that `android:init` would overwrite. Build output
+# inside it is still ignored.
+src-tauri/gen/android/app/build
+src-tauri/gen/android/build
+src-tauri/gen/android/.gradle
+src-tauri/gen/android/local.properties
 
 # Editor directories and files
 .vscode/*

@@ -30,6 +30,36 @@
     --heat-4: #216e39;
     --radius: 8px;
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+    /*
+     * How much of the viewport the system covers. Everything that needs to keep
+     * clear of a notch, status bar or home indicator reads these rather than
+     * calling env() itself, so the Android correction below applies everywhere at
+     * once.
+     */
+    --inset-top: env(safe-area-inset-top, 0px);
+    --inset-right: env(safe-area-inset-right, 0px);
+    --inset-bottom: env(safe-area-inset-bottom, 0px);
+    --inset-left: env(safe-area-inset-left, 0px);
+}
+
+/*
+ * Android reports no safe-area insets to a WebView on most versions in use: the
+ * status and navigation bar insets only reach CSS from Chrome 136, and then only
+ * for fullscreen WebViews, with the rest arriving in 144. Android 15 nonetheless
+ * lays every app out edge-to-edge, so a build that trusts env() puts its header
+ * under the status bar and its content under the navigation bar — which is why the
+ * APK does not look like the dev build.
+ *
+ * A floor is applied instead of a replacement: max() keeps the real values on the
+ * WebView versions that do report them, and only kicks in where they read 0.
+ * The figures are the Android defaults — a 24dp status bar and a 48dp navigation
+ * bar — and cost a little extra padding on a device where the system bars do not
+ * actually overlap.
+ */
+:root[data-shell="android"] {
+    --inset-top: max(env(safe-area-inset-top, 0px), 24px);
+    --inset-bottom: max(env(safe-area-inset-bottom, 0px), 48px);
 }
 
 * {
@@ -51,8 +81,35 @@ body {
     min-height: 100dvh;
     background-color: var(--color-bg);
     /* Keep content clear of notches, home indicators and status bars. */
-    padding: env(safe-area-inset-top) env(safe-area-inset-right)
-        env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding: var(--inset-top) var(--inset-right) var(--inset-bottom) var(--inset-left);
+}
+
+/*
+ * A startup or render failure, shown in the page. On a packaged APK there is no
+ * console, so without this the only symptom is a blank screen.
+ */
+.crash-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: calc(var(--inset-top) + 20px) 20px calc(var(--inset-bottom) + 20px);
+    background: var(--color-error-bg, #f8d7da);
+    color: var(--color-error-text, #842029);
+    font-family: ui-monospace, "SFMono-Regular", "Menlo", monospace;
+    font-size: 13px;
+    overflow: auto;
+}
+
+.crash-overlay-message {
+    margin: 0;
+    /* Wraps rather than scrolls sideways: a stack trace read on a phone is
+       useless if half of each line is off screen. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 /*

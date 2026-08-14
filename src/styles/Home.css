@@ -190,6 +190,20 @@
     cursor: not-allowed;
 }
 
+/* Where a path is typed on Android, whose pickers cannot supply one. */
+.note-path-input {
+    flex: 1;
+    min-width: 12em;
+    padding: 10px 12px;
+    background: var(--color-bg);
+    color: inherit;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-family: ui-monospace, "SFMono-Regular", "Menlo", monospace;
+    /* 16px minimum stops mobile browsers zooming in when the field is focused. */
+    font-size: 16px;
+}
+
 /* The task home reuses ProgressTracker, which carries its own card styling from
    TodoView.css. Drop the duplicate margin it assumed inside that screen. */
 .app-home-body .progress-tracker {

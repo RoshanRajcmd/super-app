@@ -133,6 +133,74 @@ npm run desktop:dev
 npm run desktop:build
 ```
 
+### Android
+
+Building for Android needs the Android SDK and NDK, and the four Rust targets Tauri
+cross-compiles to. Set `ANDROID_HOME` and `NDK_HOME`, then:
+
+```bash
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+npm run android:init      # once, generates src-tauri/gen/android
+npm run android:dev       # on a connected device or emulator
+npm run android:build     # release APK / AAB
+```
+
+The artifacts land under
+`src-tauri/gen/android/app/build/outputs/apk/universal/release/`. A release APK is
+unsigned by default; `--apk --split-per-abi` produces per-architecture APKs
+instead of the universal one.
+
+`src-tauri/gen/android` is tracked, not ignored, because the manifest is edited by
+hand (see below) and `android:init` would otherwise throw those edits away.
+
+#### Why the APK is not a pixel-for-pixel copy of `npm run dev`
+
+Two differences are expected, and both are handled in the stylesheet rather than
+being bugs to chase:
+
+- **Safe-area insets.** Android's WebView only began forwarding the status and
+  navigation bar insets to `env(safe-area-inset-*)` in Chrome 136, and then only
+  for fullscreen WebViews, with the rest landing in 144; several versions in
+  between report a flat `0px`. Android 15 lays every app out edge-to-edge
+  regardless. So `src/utils/shell.ts` tags `<html>` with `data-shell="android"`
+  and `App.css` applies a floor to `--inset-top` / `--inset-bottom` for that shell.
+  Without it, the header sits under the status bar and the footer under the
+  navigation bar — which is most of what "the APK looks completely different"
+  means.
+- **Fonts.** The body font stack resolves to the system UI font, which is SF Pro on
+  macOS and Roboto on Android. Text metrics differ slightly as a result.
+
+If the APK shows a blank screen instead, the on-screen crash overlay
+(`src/utils/crashOverlay.ts`) prints the error into the page, since a packaged app
+has no console. `adb logcat | grep -iE "chromium|console|tauri"` gives the same
+information over a cable.
+
+#### File access on Android
+
+Android's file and folder pickers return `content://` URIs, which have no
+filesystem path behind them: they cannot be re-opened later, written back to in
+place, or looked beside for a note's images. This app is built around real paths in
+a Drive-synced folder, so on Android the notes home offers **Open by path** and a
+typed folder for new notes instead of the picker.
+
+Reading arbitrary folders that way needs all-files access, which is a two-part
+grant:
+
+1. Add the permission to `src-tauri/gen/android/app/src/main/AndroidManifest.xml`,
+   inside `<manifest>` and beside the existing `<uses-permission>` entries:
+
+   ```xml
+   <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+   ```
+
+2. On the device, grant it once: Settings → Apps → SuperApp → Permissions →
+   All files access.
+
+The alternative design — Storage Access Framework tree URIs, as
+[SimpleMarkdown](https://codeberg.org/wbrawner/SimpleMarkdown) uses, which needs no
+storage permission at all — would mean giving up direct paths, and with them
+in-place saving to a synced folder and sibling-image lookup.
+
 ## Build and Quality Checks
 
 ### Build
@@ -158,7 +226,13 @@ The main scripts exposed in [package.json](package.json) are:
   "lint": "eslint .",
   "preview": "vite preview",
   "desktop:dev": "tauri dev",
-  "desktop:build": "tauri build"
+  "desktop:build": "tauri build",
+  "android:init": "tauri android init",
+  "android:dev": "tauri android dev",
+  "android:build": "tauri android build",
+  "ios:init": "tauri ios init",
+  "ios:dev": "tauri ios dev",
+  "ios:build": "tauri ios build"
 }
 ```
 

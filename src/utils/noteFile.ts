@@ -332,6 +332,27 @@ export async function pickDefaultNoteDir(): Promise<string | null> {
     return await invokeTauri<string | null>("note_pick_default_dir");
 }
 
+/**
+ * Set the folder new notes go into from a path the user typed.
+ *
+ * Returns the folder as it resolved on disk. Android's folder picker returns a
+ * `content://` URI with no path behind it, so on that platform this is the only
+ * way to set the folder at all.
+ */
+export async function setDefaultNoteDir(path: string): Promise<string> {
+    if (!isTauri()) throw new Error("note folders only exist in the app, not the browser");
+    return await invokeTauri<string>("note_set_default_dir", { path });
+}
+
+/**
+ * Open a note from a path the user typed, for the same reason as
+ * {@link setDefaultNoteDir}.
+ */
+export async function openNotePath(path: string): Promise<NoteHandle> {
+    if (!isTauri()) throw new Error("opening by path only works in the app, not the browser");
+    return toHandle(await invokeTauri<RawNote>("note_open_path", { path }));
+}
+
 /** Forget the default folder, so creating a note asks where to put it again. */
 export async function clearDefaultNoteDir(): Promise<void> {
     if (!isTauri()) return;

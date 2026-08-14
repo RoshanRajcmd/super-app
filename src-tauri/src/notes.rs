@@ -218,12 +218,40 @@ pub async fn note_pick(app: AppHandle) -> Result<Option<NotePayload>, String> {
     let Some(picked) = picked else {
         return Ok(None);
     };
-    let path = picked
-        .into_path()
-        .map_err(|e| format!("unsupported file location: {e}"))?;
+    let path = picked.into_path().map_err(|e| {
+        format!(
+            "that file has no path behind it ({e}) — on Android the picker returns a \
+             content:// URI, so open the note by typing its path instead"
+        )
+    })?;
 
     remember(&app, &path)?;
     load(path).map(Some)
+}
+
+/// Open a note at a path the user typed in, and remember it.
+///
+/// The dialog is the ordinary way in. Android's does not work for this app's
+/// purposes: it hands back a `content://` URI, which has no filesystem path
+/// behind it and so cannot be re-opened later, saved back to, or looked beside
+/// for a note's images. Typing a path is as deliberate an act as picking one, so
+/// it counts as the same authorisation — this is what puts the note on the
+/// remembered list that every other note command checks against.
+#[tauri::command]
+pub fn note_open_path(app: AppHandle, path: String) -> Result<NotePayload, String> {
+    let wanted = PathBuf::from(&path);
+    if !wanted.is_file() {
+        return Err(format!("no file at {path}"));
+    }
+
+    // Canonicalised so the remembered entry matches what later lookups resolve to,
+    // whatever shape the typed path had.
+    let resolved = wanted
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve {path}: {e}"))?;
+
+    remember(&app, &resolved)?;
+    load(resolved)
 }
 
 /// The folder new notes are saved into, or `None` while none is set.
@@ -240,15 +268,40 @@ pub async fn note_pick_default_dir(app: AppHandle) -> Result<Option<String>, Str
     let Some(picked) = app.dialog().file().blocking_pick_folder() else {
         return Ok(None);
     };
-    let dir = picked
-        .into_path()
-        .map_err(|e| format!("unsupported folder location: {e}"))?;
+    let dir = picked.into_path().map_err(|e| {
+        format!(
+            "that folder has no path behind it ({e}) — on Android the picker returns a \
+             content:// URI, so set the folder by typing its path instead"
+        )
+    })?;
 
     let pointer = default_dir_path(&app)?;
     fs::write(&pointer, dir.to_string_lossy().as_bytes())
         .map_err(|e| format!("cannot save default note folder: {e}"))?;
 
     Ok(Some(dir.to_string_lossy().into_owned()))
+}
+
+/// Point new notes at a folder the user typed in.
+///
+/// Exists for the same reason as [`note_open_path`]: Android's folder picker
+/// returns a `content://` URI that cannot be written into.
+#[tauri::command]
+pub fn note_set_default_dir(app: AppHandle, path: String) -> Result<String, String> {
+    let wanted = PathBuf::from(&path);
+    if !wanted.is_dir() {
+        return Err(format!("no folder at {path}"));
+    }
+
+    let resolved = wanted
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve {path}: {e}"))?;
+
+    let pointer = default_dir_path(&app)?;
+    fs::write(&pointer, resolved.to_string_lossy().as_bytes())
+        .map_err(|e| format!("cannot save default note folder: {e}"))?;
+
+    Ok(resolved.to_string_lossy().into_owned())
 }
 
 /// Forget the default folder, so new notes ask where to go again.

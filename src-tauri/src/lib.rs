@@ -18,6 +18,8 @@ pub fn run() {
       notes::note_create,
       notes::note_default_dir,
       notes::note_pick_default_dir,
+      notes::note_set_default_dir,
+      notes::note_open_path,
       notes::note_clear_default_dir,
       notes::note_open,
       notes::note_write,

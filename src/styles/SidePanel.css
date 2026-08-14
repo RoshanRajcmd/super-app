@@ -21,8 +21,8 @@
     border-right: 1px solid var(--color-border);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
     /* Clear notches and the status bar, as the app shell does. */
-    padding: calc(env(safe-area-inset-top) + 12px) 12px
-        calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 12px);
+    padding: calc(var(--inset-top) + 12px) 12px calc(var(--inset-bottom) + 12px)
+        calc(var(--inset-left) + 12px);
     animation: side-panel-in 0.18s ease-out;
 }
 
