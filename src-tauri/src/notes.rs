@@ -10,9 +10,11 @@
 //! dialog the user drove. So a compromised or buggy frontend can still only
 //! reach files the user chose by hand.
 
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::DialogExt;
@@ -20,6 +22,11 @@ use tauri_plugin_dialog::DialogExt;
 const RECENTS_FILE: &str = "note-recents.json";
 /// Holds the folder new notes are created in, when the user has chosen one.
 const DEFAULT_DIR_FILE: &str = "note-default-dir.txt";
+
+/// Largest image inlined into the preview. A note's own screenshots are far
+/// below this; the cap is here so a stray multi-hundred-megabyte file cannot be
+/// turned into a base64 string and handed to the webview.
+const MAX_IMAGE_BYTES: u64 = 10 * 1024 * 1024;
 
 /// How many notes to remember. Enough to cover "the ones I'm working on"
 /// without the home page list needing to scroll far.
@@ -324,6 +331,149 @@ pub fn note_open(app: AppHandle, path: String) -> Result<NotePayload, String> {
     let path = authorize(&app, &path)?;
     remember(&app, &path)?;
     load(path)
+}
+
+/// The media type for an image extension, or `None` for anything that is not an
+/// image. Doubles as the allowlist: a path that maps to `None` is never read.
+fn image_mime(path: &Path) -> Option<&'static str> {
+    let extension = path.extension()?.to_string_lossy().to_ascii_lowercase();
+    match extension.as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "svg" => Some("image/svg+xml"),
+        "bmp" => Some("image/bmp"),
+        "avif" => Some("image/avif"),
+        "ico" => Some("image/x-icon"),
+        _ => None,
+    }
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+/// Undo the percent-encoding Markdown links use for spaces and other awkward
+/// characters, so `Job%20Related/a.png` becomes the name on disk.
+///
+/// Hand-rolled rather than pulling in a dependency: the only escapes that appear
+/// in a note's own image links are `%XX` byte triplets, and a malformed one is
+/// left as written rather than rejected.
+fn percent_decode(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            if let (Some(high), Some(low)) = (hex_value(bytes[index + 1]), hex_value(bytes[index + 2]))
+            {
+                out.push(high * 16 + low);
+                index += 3;
+                continue;
+            }
+        }
+        out.push(bytes[index]);
+        index += 1;
+    }
+
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Whether `relative` is a plain forward-relative path: no root, no `..`, no
+/// Windows prefix. Anything else is refused before it is joined to a folder.
+fn is_contained_relative(relative: &Path) -> bool {
+    relative.components().all(|component| match component {
+        Component::Normal(_) | Component::CurDir => true,
+        Component::ParentDir | Component::RootDir | Component::Prefix(_) => false,
+    })
+}
+
+/// Read `path` as a `data:` URL, refusing anything too large or not an image.
+fn read_image(path: &Path) -> Result<String, String> {
+    let mime = image_mime(path).ok_or_else(|| "not an image file".to_string())?;
+
+    let meta = fs::metadata(path).map_err(|e| format!("cannot stat image: {e}"))?;
+    if meta.len() > MAX_IMAGE_BYTES {
+        return Err(format!(
+            "image is {} MB, over the {} MB limit",
+            meta.len() / (1024 * 1024),
+            MAX_IMAGE_BYTES / (1024 * 1024)
+        ));
+    }
+
+    let bytes = fs::read(path).map_err(|e| format!("cannot read image: {e}"))?;
+    Ok(format!("data:{mime};base64,{}", BASE64.encode(bytes)))
+}
+
+/// Load an image a note links to, as a `data:` URL.
+///
+/// The webview is served over its own protocol, so a relative `src` in the
+/// preview resolves against that and never reaches the disk. This walks the
+/// places the file is actually likely to be, in order:
+///
+/// 1. beside the note, at the path as written — the usual case;
+/// 2. beside the note, under just the file name, for links that carry a folder
+///    prefix relative to a vault root rather than to the note;
+/// 3. under the note's parent folder, at the path as written, which is what a
+///    vault-relative link means when notes live one folder down.
+///
+/// The result must still land inside the note's parent folder, must be a plain
+/// relative path (no `..`), and must carry an image extension. Together with
+/// `authorize` — the note itself has to be one the user opened through a dialog
+/// — that keeps this from being a way to read arbitrary files.
+#[tauri::command]
+pub fn note_image(app: AppHandle, path: String, src: String) -> Result<String, String> {
+    let note = authorize(&app, &path)?;
+    let dir = note
+        .parent()
+        .ok_or_else(|| "that note has no folder".to_string())?;
+
+    let decoded = percent_decode(&src);
+    let relative = PathBuf::from(&decoded);
+    if !is_contained_relative(&relative) {
+        return Err(format!("{decoded} is not a path next to the note"));
+    }
+    if image_mime(&relative).is_none() {
+        return Err(format!("{decoded} is not an image file"));
+    }
+
+    // Everything resolved has to sit under this, so a link cannot climb out of
+    // the area the note lives in. Falls back to the note's own folder when it
+    // has no parent, which only happens at a filesystem root.
+    let boundary = dir.parent().unwrap_or(dir);
+    let boundary = boundary
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve the note's folder: {e}"))?;
+
+    let mut candidates = vec![dir.join(&relative)];
+    if let Some(name) = relative.file_name() {
+        candidates.push(dir.join(name));
+    }
+    if let Some(parent) = dir.parent() {
+        candidates.push(parent.join(&relative));
+    }
+
+    for candidate in candidates {
+        if !candidate.is_file() {
+            continue;
+        }
+        let resolved = candidate
+            .canonicalize()
+            .map_err(|e| format!("cannot resolve image path: {e}"))?;
+        if !resolved.starts_with(&boundary) {
+            continue;
+        }
+        return read_image(&resolved);
+    }
+
+    Err(format!("couldn't find {decoded} next to this note"))
 }
 
 /// Write note text to a remembered path.

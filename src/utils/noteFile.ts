@@ -274,6 +274,45 @@ export async function saveNoteTo(
 }
 
 /**
+ * Resolved image data URLs, keyed by note path and link.
+ *
+ * The preview re-renders on every keystroke, so without this each render would
+ * re-read and re-encode every image in the note. Cleared when the editor moves
+ * to another note, which is also when a replaced image file gets picked up.
+ */
+const imageCache = new Map<string, Promise<string>>();
+
+/** Forget cached images. Called when the editor opens a different note. */
+export function clearNoteImageCache(): void {
+    imageCache.clear();
+}
+
+/**
+ * Load an image a note links to by a relative path, as a `data:` URL.
+ *
+ * Only meaningful for file-backed notes: a store-backed note has no folder for
+ * the link to be relative to, so this rejects rather than guessing.
+ */
+export function noteImage(source: NoteSource, src: string): Promise<string> {
+    if (source.kind !== "file") {
+        return Promise.reject(
+            new Error("images need a note stored as a file, not one in app storage")
+        );
+    }
+
+    const key = `${source.path}\u0000${src}`;
+    const cached = imageCache.get(key);
+    if (cached) return cached;
+
+    const pending = invokeTauri<string>("note_image", { path: source.path, src });
+    imageCache.set(key, pending);
+    // A failed read should be retried the next time the note is opened rather
+    // than cached as a permanent failure.
+    pending.catch(() => imageCache.delete(key));
+    return pending;
+}
+
+/**
  * The folder new notes are created in, or `null` while none is set.
  *
  * Browser-only notes have no folder to speak of, so this is always `null` there.

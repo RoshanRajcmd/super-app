@@ -21,6 +21,7 @@ pub fn run() {
       notes::note_clear_default_dir,
       notes::note_open,
       notes::note_write,
+      notes::note_image,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

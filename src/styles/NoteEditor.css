@@ -5,7 +5,7 @@
     height: 100vh;
     /* .app pads itself by the safe-area insets, so subtract them here or the
        editor overflows the viewport by that much and the bottom gets cut off. */
-    height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    height: calc(100dvh - var(--inset-top) - var(--inset-bottom));
 }
 
 .note-header {
@@ -43,12 +43,15 @@
     display: flex;
     overflow: hidden;
     padding: 20px;
+    /* Anchors the heading-navigation handle to the right edge of the text. */
+    position: relative;
 }
 
 .note-textarea {
     width: 100%;
     height: 100%;
-    padding: 20px;
+    /* Wider on the right to clear the heading-navigation handle. */
+    padding: 20px 36px 20px 20px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
@@ -60,7 +63,7 @@
 
 .note-preview {
     width: 100%;
-    padding: 20px;
+    padding: 20px 36px 20px 20px;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
@@ -99,6 +102,23 @@
 
 .markdown-body h3 {
     font-size: 1.25em;
+}
+
+/* h4 and h5 were previously unsized, which left them at the browser's defaults —
+   0.83em and 0.67em — so a `#####` heading rendered *smaller* than the body text
+   it introduced. Sized down gently instead, and never below the body, with only
+   weight and colour separating the deepest levels. */
+.markdown-body h4 {
+    font-size: 1.1em;
+}
+
+.markdown-body h5 {
+    font-size: 1em;
+}
+
+.markdown-body h6 {
+    font-size: 1em;
+    color: var(--color-text-secondary);
 }
 
 .markdown-body a {
@@ -148,10 +168,22 @@
     margin-bottom: 8px;
 }
 
+/* Tables get their own horizontal scroller. Without it a wide table either
+   crushes its columns to unreadable widths or stretches the preview sideways and
+   takes the surrounding prose with it. */
+.md-table-scroll {
+    margin: 16px 0;
+    overflow-x: auto;
+    /* Momentum scrolling, and lets a swipe on the table pan it rather than the
+       page underneath. */
+    -webkit-overflow-scrolling: touch;
+}
+
 .markdown-body table {
     border-collapse: collapse;
-    width: 100%;
-    margin: 16px 0;
+    /* Wide enough for its content, but still filling the preview when narrow. */
+    width: max-content;
+    min-width: 100%;
 }
 
 .markdown-body table th,
@@ -164,6 +196,266 @@
 .markdown-body table th {
     background: var(--color-bg);
     font-weight: 600;
+}
+
+/* Indentation carried over from the note's source.
+   Markdown itself throws this away — up to three leading spaces are ignored and
+   four or more become a code block — so the text is split into indentation groups
+   before parsing and the depth is re-applied here as layout. `ch` units, because
+   the intent being preserved is "lines up with the text above it". */
+.md-indent {
+    /* Capped: a deeply indented block on a phone would otherwise be squeezed into
+       a column a few characters wide. */
+    padding-left: min(var(--md-indent), 25%);
+}
+
+/* Wrapped lines sit deeper than the line's own start, so a wrapped answer stays
+   visibly subordinate to the question it follows instead of running back to the
+   same margin and reading like a new point. */
+.md-indent > p {
+    padding-left: 1.5em;
+    text-indent: -1.5em;
+}
+
+.md-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 16px 0;
+    border-radius: var(--radius);
+}
+
+/* A note whose image is missing says so. The alternative is a blank gap the
+   reader cannot tell apart from a formatting mistake. */
+.md-image-missing,
+.md-image-loading {
+    display: inline-block;
+    padding: 6px 10px;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-text-secondary);
+    font-size: 0.9em;
+}
+
+.md-image-missing {
+    border-style: solid;
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
+    border-color: var(--color-error-border);
+}
+
+/* Search hits. Fixed colours rather than theme variables: the point is contrast
+   against whatever the surrounding text is, in every theme. */
+.note-match {
+    background: #ffe066;
+    color: #1a1a1a;
+    border-radius: 2px;
+}
+
+.note-match-active {
+    background: #ff9f1a;
+    color: #1a1a1a;
+    box-shadow: 0 0 0 2px rgba(255, 159, 26, 0.45);
+}
+
+/* Find, and replace while editing. */
+.note-find {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 12px 20px 0;
+    padding: 10px 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.note-find-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.note-find-input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: inherit;
+    /* 16px minimum stops iOS Safari from zooming when the field is focused. */
+    font-size: 16px;
+}
+
+.note-find-case,
+.note-find-toggle,
+.note-find-action {
+    flex-shrink: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.note-find-case {
+    font-weight: 600;
+}
+
+.note-find-case.active,
+.note-find-toggle.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+.note-find-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.note-find-action:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* Fixed width so stepping through hits does not shift the buttons beside it. */
+.note-find-count {
+    flex-shrink: 0;
+    min-width: 5.5em;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 0.85em;
+}
+
+.note-find-step:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* Quick navigation between headings.
+   A slim handle down the right edge of the text, in the place a phone reader puts
+   its scrubber, so it is reachable with a thumb without covering the writing. */
+.note-toc-handle {
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    padding: 8px 4px;
+    border: none;
+    border-radius: var(--radius);
+    background: transparent;
+    cursor: pointer;
+    /* Above the preview so the ticks stay visible over scrolled content. */
+    z-index: 2;
+}
+
+.note-toc-handle:hover .note-toc-tick {
+    background: var(--color-primary);
+}
+
+.note-toc-ticks {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+}
+
+/* One tick per heading, its length its depth, so the strip reads as an outline of
+   the note at a glance. */
+.note-toc-tick {
+    height: 2px;
+    border-radius: 1px;
+    background: var(--color-text-secondary);
+    opacity: 0.6;
+}
+
+.note-toc-tick.level-1 {
+    width: 16px;
+}
+
+.note-toc-tick.level-2 {
+    width: 11px;
+}
+
+.note-toc-tick.level-3 {
+    width: 7px;
+}
+
+.note-toc-scrim {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: flex-end;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 20;
+}
+
+.note-toc-panel {
+    display: flex;
+    flex-direction: column;
+    width: min(320px, 85vw);
+    height: 100%;
+    background: var(--color-surface);
+    border-left: 1px solid var(--color-border);
+    box-shadow: var(--shadow);
+    overflow-y: auto;
+}
+
+.note-toc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 16px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.note-toc-head h2 {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 600;
+}
+
+.note-toc-list {
+    margin: 0;
+    padding: 8px 0;
+    list-style: none;
+}
+
+.note-toc-item {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    background: none;
+    color: inherit;
+    font-size: 0.95em;
+    text-align: left;
+    cursor: pointer;
+}
+
+.note-toc-item:hover {
+    background: var(--color-bg);
+}
+
+.note-toc-item.level-1 {
+    font-weight: 600;
+}
+
+.note-toc-item.level-2 {
+    padding-left: 32px;
+}
+
+.note-toc-item.level-3 {
+    padding-left: 48px;
+    color: var(--color-text-secondary);
 }
 
 /* Save and load failures, and the reload notice after a conflict. */
@@ -199,9 +491,19 @@
         padding: 12px;
     }
 
+    .note-find {
+        margin: 8px 12px 0;
+        padding: 8px;
+    }
+
+    /* The count is the first thing to give up its space when the row is tight. */
+    .note-find-count {
+        min-width: 0;
+    }
+
     .note-textarea,
     .note-preview {
-        padding: 12px;
+        padding: 12px 30px 12px 12px;
     }
 
     /* 16px minimum stops iOS Safari from zooming when the field is focused. */
