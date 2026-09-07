@@ -1,5 +1,6 @@
 import type { HabitSheet } from "../types";
-import { dayStats, heatLevel } from "../utils/habitStats";
+import { appliesOnDayType, dayStats, heatLevel } from "../utils/habitStats";
+import { dayTypeLabel } from "../utils/habitLabels";
 import { formatDayShort, isFuture, today } from "../utils/dateUtils";
 
 interface HabitGridProps {
@@ -78,24 +79,29 @@ export default function HabitGrid({
                                 // counted either way, so the cell is shown as
                                 // inactive rather than as an unchecked miss.
                                 const untracked = date < habit.trackedFrom;
+                                // A weekend-only habit is not due on a Tuesday, so
+                                // the cell is locked rather than left temptingly
+                                // tickable and then ignored by every score.
+                                const offDay = !appliesOnDayType(habit, date);
+                                const note = offDay
+                                    ? `${dayTypeLabel(habit.dayType)} only`
+                                    : untracked
+                                      ? `Not tracked yet — added ${habit.trackedFrom}`
+                                      : undefined;
                                 return (
                                     <td
                                         key={date}
                                         className={`habit-cell ${date === now ? "is-today" : ""} ${
                                             untracked ? "is-untracked" : ""
-                                        }`}
-                                        title={
-                                            untracked
-                                                ? `Not tracked yet — added ${habit.trackedFrom}`
-                                                : undefined
-                                        }
+                                        } ${offDay ? "is-offday" : ""}`}
+                                        title={note}
                                     >
                                         <input
                                             type="checkbox"
                                             checked={done}
-                                            disabled={busy || isFuture(date)}
+                                            disabled={busy || isFuture(date) || offDay}
                                             aria-label={`${habit.name} on ${date}${
-                                                untracked ? " (not tracked yet)" : ""
+                                                note ? ` (${note})` : ""
                                             }`}
                                             onChange={(e) =>
                                                 onToggle(habit.name, date, e.target.checked)

@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
-import type { HabitRow, HabitSheet } from "../types";
+import type { HabitDayType, HabitRow, HabitSheet } from "../types";
 import { ISO_DAY, daysInYear, toIsoDay } from "./dateUtils";
 import { dayStats } from "./habitStats";
 
@@ -9,8 +9,10 @@ dayjs.extend(customParseFormat);
 /**
  * Reading and writing the habit sheet, a single UTF-8 CSV file.
  *
- * Layout: row 1 is the header — column A holds the habit names, column B the
- * date each habit joined the routine, and every remaining column is one day.
+ * Layout: row 1 is the header — column A holds the habit names, then two
+ * optional columns describe each habit ("Tracked from", the date it joined the
+ * routine, and "DayType", whether it applies on weekends, weekdays or both),
+ * and every remaining column is one day.
  * Row 2 is the "Daily Progress %" row, holding that day's completion
  * percentage. Habits start at row 3, and the intersection of a habit and a day
  * is marked when that habit was completed that day.
@@ -30,6 +32,10 @@ dayjs.extend(customParseFormat);
 const MARK = "x";
 const HABIT_HEADER = "Habit";
 const TRACKED_FROM_HEADER = "Tracked from";
+/** Header of the column saying which kind of day a habit applies to. */
+const DAY_TYPE_HEADER = "DayType";
+/** The only values that column may hold; `both` is also what a blank cell means. */
+const DAY_TYPES: HabitDayType[] = ["weekend", "weekday", "both"];
 /** Label in column A of the derived percentage row. */
 const PROGRESS_LABEL = "Daily Progress %";
 /** Where the progress row is written when the sheet has none. */
@@ -92,6 +98,11 @@ export interface HabitBook {
      * none (one written by hand, or by an older version of this app).
      */
     trackedFromColumn: number | null;
+    /**
+     * Column holding each habit's `DayType`, or `null` for a sheet without one —
+     * every habit then applies to both kinds of day.
+     */
+    dayTypeColumn: number | null;
     /** Row holding the daily percentages. Never `null` after parsing. */
     progressRow: number | null;
     /** Column headers that could not be read as dates, for surfacing to the user. */
@@ -304,6 +315,24 @@ function findTrackedFromColumn(header: string[]): number | null {
     return null;
 }
 
+function findDayTypeColumn(header: string[]): number | null {
+    for (let col = 1; col < header.length; col++) {
+        if (header[col].trim().toLowerCase() === DAY_TYPE_HEADER.toLowerCase()) return col;
+    }
+    return null;
+}
+
+/**
+ * Read a `DayType` cell.
+ *
+ * Blank, missing or unrecognised text means both kinds of day: a typo should not
+ * silently switch a habit off for most of the week.
+ */
+function parseDayType(value: string): HabitDayType {
+    const text = value.trim().toLowerCase();
+    return DAY_TYPES.find((type) => type === text) ?? "both";
+}
+
 /**
  * The year the file covers, taken from whichever headers name one outright.
  *
@@ -311,11 +340,11 @@ function findTrackedFromColumn(header: string[]): number | null {
  * it and `preferredYear` only breaks ties for a sheet whose headers are all
  * year-less ("Mar 4").
  */
-function inferYear(header: string[], skipColumn: number | null, preferredYear: number): number {
+function inferYear(header: string[], skipColumns: Set<number>, preferredYear: number): number {
     const counts = new Map<number, number>();
 
     for (let col = 1; col < header.length; col++) {
-        if (col === skipColumn) continue;
+        if (skipColumns.has(col)) continue;
         const iso = resolveHeaderDate(header[col], null);
         if (iso === null) continue;
         const y = Number(iso.slice(0, 4));
@@ -348,13 +377,18 @@ export function parseHabitBook(bytes: Uint8Array, preferredYear: number): HabitB
     const header = grid[0];
 
     const trackedFromColumn = findTrackedFromColumn(header);
-    const year = inferYear(header, trackedFromColumn, preferredYear);
+    const dayTypeColumn = findDayTypeColumn(header);
+    // Neither is a date column, so both are kept out of the date scan below.
+    const describeColumns = new Set(
+        [trackedFromColumn, dayTypeColumn].filter((c): c is number => c !== null)
+    );
+    const year = inferYear(header, describeColumns, preferredYear);
 
     const dateColumns = new Map<string, number>();
     const unreadableHeaders: string[] = [];
 
     for (let col = 1; col < header.length; col++) {
-        if (col === trackedFromColumn) continue;
+        if (describeColumns.has(col)) continue;
         const raw = header[col];
         if (raw.trim() === "") continue;
         const iso = resolveHeaderDate(raw, year);
@@ -405,8 +439,12 @@ export function parseHabitBook(bytes: Uint8Array, preferredYear: number): HabitB
         let trackedFrom = declared ?? sheetStart;
         if (earliestMark !== null && earliestMark < trackedFrom) trackedFrom = earliestMark;
 
+        const dayType = dayTypeColumn === null
+            ? "both"
+            : parseDayType(cell(grid, row, dayTypeColumn));
+
         habitRows.set(name, row);
-        habits.push({ name, done, trackedFrom });
+        habits.push({ name, done, trackedFrom, dayType });
     }
 
     const book: HabitBook = {
@@ -415,6 +453,7 @@ export function parseHabitBook(bytes: Uint8Array, preferredYear: number): HabitB
         dateColumns,
         habitRows,
         trackedFromColumn,
+        dayTypeColumn,
         progressRow,
         unreadableHeaders,
     };
@@ -425,6 +464,12 @@ export function parseHabitBook(bytes: Uint8Array, preferredYear: number): HabitB
     return book;
 }
 
+/** A habit to seed a new sheet with: its name and the days it applies to. */
+export interface HabitSeed {
+    name: string;
+    dayType: HabitDayType;
+}
+
 /**
  * Build a fresh book: a header, the percentage row, then one row per habit,
  * with a column for every day of `year`.
@@ -432,23 +477,23 @@ export function parseHabitBook(bytes: Uint8Array, preferredYear: number): HabitB
  * `trackedFrom` is the start date recorded for every seed habit — the day the
  * sheet was created, so earlier days in the year are not counted as missed.
  */
-export function createHabitBook(year: number, habitNames: string[], trackedFrom: string): HabitBook {
+export function createHabitBook(year: number, seeds: HabitSeed[], trackedFrom: string): HabitBook {
     const days = daysInYear(year);
     const blanks = days.map(() => "");
 
     const grid: string[][] = [
-        [HABIT_HEADER, TRACKED_FROM_HEADER, ...days],
-        [PROGRESS_LABEL, "", ...blanks],
-        ...habitNames.map((name) => [name, trackedFrom, ...blanks]),
+        [HABIT_HEADER, TRACKED_FROM_HEADER, DAY_TYPE_HEADER, ...days],
+        [PROGRESS_LABEL, "", "", ...blanks],
+        ...seeds.map((seed) => [seed.name, trackedFrom, seed.dayType, ...blanks]),
     ];
 
     const dateColumns = new Map<string, number>();
-    days.forEach((iso, i) => dateColumns.set(iso, i + 2));
+    days.forEach((iso, i) => dateColumns.set(iso, i + 3));
 
     const habitRows = new Map<string, number>();
-    const habits: HabitRow[] = habitNames.map((name, i) => {
-        habitRows.set(name, i + 2);
-        return { name, done: new Set<string>(), trackedFrom };
+    const habits: HabitRow[] = seeds.map((seed, i) => {
+        habitRows.set(seed.name, i + 2);
+        return { name: seed.name, done: new Set<string>(), trackedFrom, dayType: seed.dayType };
     });
 
     return {
@@ -457,6 +502,7 @@ export function createHabitBook(year: number, habitNames: string[], trackedFrom:
         dateColumns,
         habitRows,
         trackedFromColumn: 1,
+        dayTypeColumn: 2,
         progressRow: PROGRESS_ROW_INDEX,
         unreadableHeaders: [],
     };
@@ -515,13 +561,40 @@ function ensureTrackedFromColumn(book: HabitBook): number {
 }
 
 /**
- * Add a habit as a new bottom row, tracked from `trackedFrom` onwards.
+ * Add the `DayType` column to a sheet that has none, marking every existing
+ * habit as applying to both kinds of day — which is how the sheet already
+ * behaved.
+ */
+function ensureDayTypeColumn(book: HabitBook): number {
+    if (book.dayTypeColumn !== null) return book.dayTypeColumn;
+
+    const col = gridWidth(book.grid);
+    setCell(book.grid, 0, col, DAY_TYPE_HEADER);
+
+    for (const habit of book.sheet.habits) {
+        const row = book.habitRows.get(habit.name);
+        if (row === undefined) continue;
+        setCell(book.grid, row, col, habit.dayType);
+    }
+
+    book.dayTypeColumn = col;
+    return col;
+}
+
+/**
+ * Add a habit as a new bottom row, tracked from `trackedFrom` onwards and
+ * applying to `dayType`'s days.
  *
  * Recording the start date is what stops a habit added today from making every
  * earlier day look incomplete. No-op if the name is already present; returns the
  * row index.
  */
-export function addHabit(book: HabitBook, name: string, trackedFrom: string): number {
+export function addHabit(
+    book: HabitBook,
+    name: string,
+    trackedFrom: string,
+    dayType: HabitDayType = "both"
+): number {
     const trimmed = name.trim();
     if (trimmed === "") throw new Error("A habit needs a name.");
 
@@ -530,14 +603,28 @@ export function addHabit(book: HabitBook, name: string, trackedFrom: string): nu
 
     ensureProgressRow(book);
     const startColumn = ensureTrackedFromColumn(book);
+    const typeColumn = ensureDayTypeColumn(book);
     const row = book.grid.length;
 
     setCell(book.grid, row, 0, trimmed);
     setCell(book.grid, row, startColumn, trackedFrom);
+    setCell(book.grid, row, typeColumn, dayType);
 
     book.habitRows.set(trimmed, row);
-    book.sheet.habits.push({ name: trimmed, done: new Set<string>(), trackedFrom });
+    book.sheet.habits.push({ name: trimmed, done: new Set<string>(), trackedFrom, dayType });
     return row;
+}
+
+/** Change which kind of day a habit applies to. */
+export function setDayType(book: HabitBook, habitName: string, dayType: HabitDayType): void {
+    const row = book.habitRows.get(habitName);
+    if (row === undefined) throw new Error(`Unknown habit: ${habitName}`);
+
+    const col = ensureDayTypeColumn(book);
+    setCell(book.grid, row, col, dayType);
+
+    const habit = book.sheet.habits.find((h) => h.name === habitName);
+    if (habit) habit.dayType = dayType;
 }
 
 /** Delete a habit's row and drop it from the in-memory sheet. */
@@ -620,6 +707,7 @@ export function refreshProgressRow(book: HabitBook): void {
     const row = ensureProgressRow(book);
     setCell(book.grid, row, 0, PROGRESS_LABEL);
     if (book.trackedFromColumn !== null) setCell(book.grid, row, book.trackedFromColumn, "");
+    if (book.dayTypeColumn !== null) setCell(book.grid, row, book.dayTypeColumn, "");
 
     for (const [date, col] of book.dateColumns) {
         const { possible, percent } = dayStats(book.sheet, date);

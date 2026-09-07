@@ -376,6 +376,25 @@
     opacity: 0.35;
 }
 
+/*
+ * A day the habit's DayType excludes — a weekend chore on a Tuesday. Hatched the
+ * other way round from "not tracked yet" so the two read as different states, and
+ * greyed because the cell cannot be ticked at all.
+ */
+.habit-cell.is-offday {
+    background: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 3px,
+        var(--color-border) 3px,
+        var(--color-border) 4px
+    );
+}
+
+.habit-cell.is-offday input[type="checkbox"] {
+    opacity: 0.2;
+}
+
 .habit-cell input[type="checkbox"] {
     width: 16px;
     height: 16px;
@@ -452,6 +471,12 @@
 
 .habit-day-item.untracked {
     border-style: dashed;
+}
+
+/* Not due today at all, so it is dimmed rather than merely marked out. */
+.habit-day-item.offday {
+    border-style: dashed;
+    opacity: 0.55;
 }
 
 .untracked-tag {
@@ -581,17 +606,48 @@
 /* Add habit row */
 .habit-add-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 16px 20px;
 }
 
 .habit-add-row input {
     flex: 1;
+    /* A text input's default width is wider than a phone, so let flex shrink it
+       rather than pushing the day picker and the button off the screen edge. */
+    min-width: 0;
     padding: 10px 12px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     font-size: 1em;
     font-family: inherit;
+}
+
+/*
+ * DayType picker, in both add rows. Sized like the inputs beside it but never
+ * stretched: the three labels are short and a wide select looks like a text field.
+ */
+.day-type-select {
+    flex: 0 0 auto;
+    padding: 9px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.day-type-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.setup-habit-list .day-type-select {
+    padding: 4px 6px;
+    font-size: 0.85em;
+    margin-left: auto;
 }
 
 .habit-add-row button {
@@ -677,7 +733,7 @@
 .setup-habit-list li {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
     padding: 6px 0;
     border-bottom: 1px solid var(--color-border);
     font-size: 0.9em;
@@ -685,12 +741,14 @@
 
 .setup-add-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 16px;
 }
 
 .setup-add-row input {
     flex: 1;
+    min-width: 0;
     padding: 8px 10px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius);

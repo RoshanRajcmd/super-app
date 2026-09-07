@@ -147,6 +147,19 @@ export async function createSheetLocation(suggestedName: string): Promise<SheetH
     return payload === null ? null : toHandle(payload);
 }
 
+/**
+ * Modification time of the chosen sheet, without reading it.
+ *
+ * Used to poll for edits synced in from another machine cheaply. `null` when
+ * nothing is selected, in the browser (no shared file), and on the Android
+ * document providers that decline to report a time — so `null` means "cannot
+ * tell", not "unchanged", and the caller must fall back to `reloadSheet`.
+ */
+export async function sheetMtime(): Promise<number | null> {
+    if (!isTauri()) return null;
+    return await invokeTauri<number | null>("habit_sheet_mtime");
+}
+
 /** Re-read the chosen sheet, picking up edits made in Excel or synced from another device. */
 export async function reloadSheet(): Promise<SheetHandle> {
     if (!isTauri()) {
@@ -161,8 +174,9 @@ export async function reloadSheet(): Promise<SheetHandle> {
 /**
  * Write the sheet back, refusing if the file changed since `expectedMtime`.
  *
- * Returns the new modification time. Throws `SheetConflictError` when the
- * on-disk file no longer matches, so the caller can reload rather than
+ * Returns the new modification time, or `null` where the location cannot report
+ * one — some Android document providers do not. Throws `SheetConflictError` when
+ * the on-disk file no longer matches, so the caller can reload rather than
  * overwrite someone else's edits.
  */
 export async function saveSheet(bytes: Uint8Array, expectedMtime: number | null): Promise<number | null> {
@@ -172,7 +186,7 @@ export async function saveSheet(bytes: Uint8Array, expectedMtime: number | null)
     }
 
     try {
-        return await invokeTauri<number>("habit_sheet_write", {
+        return await invokeTauri<number | null>("habit_sheet_write", {
             data: encode(bytes),
             expectedMtime,
         });

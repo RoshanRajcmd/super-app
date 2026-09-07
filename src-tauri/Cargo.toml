@@ -25,4 +25,7 @@ tauri = { version = "2.9.5", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
+# Not exposed to the webview: used from Rust for its one cross-platform trick,
+# opening an Android `content://` URI as a real file. See `android_saf`.
+tauri-plugin-fs = "2"
 base64 = "0.22"

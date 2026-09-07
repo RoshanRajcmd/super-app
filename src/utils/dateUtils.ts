@@ -125,3 +125,9 @@ export function formatMonthYear(date: string): string {
 export function isFuture(date: string): boolean {
     return dayjs(date).isAfter(dayjs(), "day");
 }
+
+/** Saturday or Sunday. Used to decide which habits apply on a day. */
+export function isWeekend(date: string): boolean {
+    const day = dayjs(date).day();
+    return day === 0 || day === 6;
+}

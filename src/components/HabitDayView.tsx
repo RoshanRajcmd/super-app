@@ -1,5 +1,7 @@
 import type { HabitSheet } from "../types";
 import { isFuture } from "../utils/dateUtils";
+import { appliesOnDayType } from "../utils/habitStats";
+import { dayTypeLabel } from "../utils/habitLabels";
 
 interface HabitDayViewProps {
     sheet: HabitSheet;
@@ -39,27 +41,36 @@ export default function HabitDayView({
                 // Days before the habit joined the routine do not count towards
                 // its score; ticking one moves its start date back.
                 const untracked = date < habit.trackedFrom;
+                // Not due on this kind of day, so it is locked instead of looking
+                // like a habit that was skipped.
+                const offDay = !appliesOnDayType(habit, date);
                 const id = `habit-${date}-${habit.name.replace(/\s+/g, "-")}`;
                 return (
                     <div
                         key={habit.name}
                         className={`habit-day-item ${done ? "completed" : ""} ${
                             untracked ? "untracked" : ""
-                        }`}
+                        } ${offDay ? "offday" : ""}`}
                     >
                         <input
                             id={id}
                             type="checkbox"
                             checked={done}
-                            disabled={busy || future}
+                            disabled={busy || future || offDay}
                             onChange={(e) => onToggle(habit.name, date, e.target.checked)}
                         />
                         <label htmlFor={id}>
                             {habit.name}
-                            {untracked && (
+                            {offDay ? (
                                 <span className="untracked-tag">
-                                    added {habit.trackedFrom}
+                                    {dayTypeLabel(habit.dayType).toLowerCase()} only
                                 </span>
+                            ) : (
+                                untracked && (
+                                    <span className="untracked-tag">
+                                        added {habit.trackedFrom}
+                                    </span>
+                                )
                             )}
                         </label>
                         <button

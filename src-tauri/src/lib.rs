@@ -1,15 +1,28 @@
+#[cfg(target_os = "android")]
+mod android_saf;
 mod habit_sheet;
 mod notes;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
+  let builder = tauri::Builder::default()
     .plugin(tauri_plugin_store::Builder::default().build())
     .plugin(tauri_plugin_dialog::init())
+    // Registered for Rust's benefit only — it is what opens an Android
+    // `content://` URI as a file. The frontend is granted none of its
+    // permissions, so none of its commands are reachable from the webview.
+    .plugin(tauri_plugin_fs::init());
+
+  // The Storage Access Framework has no counterpart elsewhere.
+  #[cfg(target_os = "android")]
+  let builder = builder.plugin(android_saf::init());
+
+  builder
     .invoke_handler(tauri::generate_handler![
       habit_sheet::habit_sheet_current,
       habit_sheet::habit_sheet_pick,
       habit_sheet::habit_sheet_create,
+      habit_sheet::habit_sheet_mtime,
       habit_sheet::habit_sheet_read,
       habit_sheet::habit_sheet_write,
       habit_sheet::habit_sheet_export,

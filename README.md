@@ -100,6 +100,11 @@ This means the app should read and write files that can be moved between environ
 - Spreadsheet and tracker-oriented habit view
 - Heatmap-style activity visualization
 - Completion and consistency reporting for patterns over time
+- A `DayType` column per habit — `weekend`, `weekday` or `both` (blank counts as
+  `both`) — so a weekend chore is locked and ignored by the score on a Tuesday
+  instead of reading as a miss
+- The sheet is re-read every 30 seconds and whenever the app returns to the
+  foreground, so an edit synced in from another machine shows up on its own
 
 ## Developer Setup
 
@@ -135,29 +140,119 @@ npm run desktop:build
 
 ### Android
 
-Building for Android needs the Android SDK and NDK, and the four Rust targets Tauri
-cross-compiles to. Set `ANDROID_HOME` and `NDK_HOME`, then:
+#### Toolchain
+
+Building for Android needs the Android SDK and NDK, the four Rust targets Tauri
+cross-compiles to, and **JDK 21** — not the JDK bundled with Android Studio.
+
+`JAVA_HOME` is the one that bites. Leave it unset and the Tauri CLI silently falls
+back to Android Studio's bundled JDK, which Gradle cannot configure, so every
+Android command has to run in a shell that has it set:
+
+```bash
+export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
+npm run android:dev
+```
+
+Put all four in `~/.zshrc` rather than retyping them per terminal:
+
+```bash
+export JAVA_HOME="$(/usr/libexec/java_home -v 21)"     # see "Gradle fails on ':buildSrc'" below
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+export NDK_HOME="$ANDROID_HOME/ndk/<version>"          # e.g. 30.0.16138531
+export PATH="$ANDROID_HOME/platform-tools:$PATH"       # puts adb on the path
+```
+
+`java -version` should report 21 afterwards. Then:
 
 ```bash
 rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
 npm run android:init      # once, generates src-tauri/gen/android
-npm run android:dev       # on a connected device or emulator
+npm run android:dev       # on a connected device or emulator, served by the vite dev server
 npm run android:build     # release APK / AAB
 ```
 
-The artifacts land under
+Release artifacts land under
 `src-tauri/gen/android/app/build/outputs/apk/universal/release/`. A release APK is
-unsigned by default; `--apk --split-per-abi` produces per-architecture APKs
-instead of the universal one.
+unsigned by default. `--split-per-abi` produces per-architecture APKs instead of the
+universal one, and `--apk` / `--aab` take an explicit value:
+
+```bash
+npm run tauri -- android build --apk true --split-per-abi
+```
 
 `src-tauri/gen/android` is tracked, not ignored, because the manifest is edited by
 hand (see below) and `android:init` would otherwise throw those edits away.
 
+#### Running the packaged UI on an emulator or phone
+
+`npm run android:dev` loads the UI from the vite dev server, so it does not exercise
+the assets that are actually embedded in the binary. To look at the packaged build,
+build a **debug APK** — same embedded `build/` output as release, but debuggable and
+installable without signing — and push it over adb:
+
+```bash
+npm run tauri -- android build --debug --apk true --target aarch64   # match the device ABI
+adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+adb shell am start -n com.superapp.productivity/.MainActivity
+```
+
+`adb shell getprop ro.product.cpu.abi` reports the ABI to pass to `--target`
+(`arm64-v8a` → `aarch64`); drop `--target` to build all four. Debug builds keep
+WebView debugging on, so `chrome://inspect` in desktop Chrome attaches devtools to
+the running app, and `adb shell screencap -p /sdcard/s.png && adb pull /sdcard/s.png`
+grabs a screenshot.
+
+Android Studio is not needed for any of this, and opening `src-tauri/gen/android`
+there is the slower path — see the two failure modes below.
+
+#### Troubleshooting the toolchain
+
+**Gradle fails on `':buildSrc'`.** The Tauri CLI points `JAVA_HOME` at the JDK
+bundled with Android Studio when the variable is unset. Recent Android Studio ships
+JDK 25, which the `kotlin-dsl` plugin under Gradle 8.14 cannot configure, and the
+error is just the version number with no context:
+
+```
+A problem occurred configuring project ':buildSrc'.
+> 25.0.2
+```
+
+The patch number tracks whatever Android Studio currently bundles, so it also shows
+up as `> 25.0.3` and so on. The giveaway is a line earlier in the same output:
+
+```
+Info Using Android Studio's default Java installation: /Applications/Android Studio.app/Contents/jbr/Contents/Home
+```
+
+Setting `JAVA_HOME` to JDK 21 as shown above fixes it. If the error survives that,
+a daemon is still alive on the wrong JVM — `src-tauri/gen/android/gradlew --stop`
+clears it.
+
+**`Cannot run program "npm"` during `:app:rustBuildArmDebug`.** The generated Gradle
+project shells out to `npm` to build the Rust library. macOS apps launched from the
+Dock or Finder inherit only the bare system `PATH`, so a Homebrew or nvm-managed npm
+is invisible to Android Studio:
+
+```
+Caused by: java.io.IOException: Cannot run program "npm" (in directory ".../src-tauri"): error=2
+```
+
+Build from the terminal instead. If you do want Android Studio, launch it from a
+shell so it inherits your `PATH`
+(`/Applications/Android\ Studio.app/Contents/MacOS/studio &` — `open -a` does not
+work, launchd strips the environment), or symlink node and npm into `/usr/local/bin`.
+
 #### Why the APK is not a pixel-for-pixel copy of `npm run dev`
 
-Two differences are expected, and both are handled in the stylesheet rather than
-being bugs to chase:
+Three differences are expected rather than being bugs to chase:
 
+- **Stored content.** [src/utils/platform.ts](src/utils/platform.ts) picks the
+  storage backend from whether `__TAURI_INTERNALS__` is present: `localStorage` in a
+  plain browser tab, the Tauri store plugin everywhere else. A browser tab and a
+  fresh Android install therefore start from different data, so the APK opens on
+  empty states — no recent notes, no tasks, no habit sheet — where `npm run dev`
+  shows whatever you accumulated. Same components, different content.
 - **Safe-area insets.** Android's WebView only began forwarding the status and
   navigation bar insets to `env(safe-area-inset-*)` in Chrome 136, and then only
   for fullscreen WebViews, with the rest landing in 144; several versions in
@@ -196,10 +291,37 @@ grant:
 2. On the device, grant it once: Settings → Apps → SuperApp → Permissions →
    All files access.
 
-The alternative design — Storage Access Framework tree URIs, as
+The habit tracker goes the other way, because a single file needs no folder
+tree: it opens the system document browser (a small in-app Kotlin plugin,
+`src-tauri/gen/android/.../SafPlugin.kt`, plus `android_saf.rs`), takes a
+persistable read-write grant on the document, and reads and writes it through
+`tauri-plugin-fs`. That survives restarts and needs no storage permission, so
+there is no typed path anywhere in the habit UI. The one catch is above: a program
+that replaces the file rather than rewriting it invalidates the grant.
+
+The alternative design for notes — Storage Access Framework tree URIs, as
 [SimpleMarkdown](https://codeberg.org/wbrawner/SimpleMarkdown) uses, which needs no
 storage permission at all — would mean giving up direct paths, and with them
 in-place saving to a synced folder and sibling-image lookup.
+
+### To move files into android studio emulator
+
+```bash
+export PATH="$HOME/Library/Android/sdk/platform-tools:$PATH"
+adb push /Users/roshnrj/Documents/MyDocs/HabitTracker2026.csv /sdcard/Documents/HabitTracker2026.csv
+adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Documents/HabitTracker2026.csv
+```
+
+`adb push` deletes and recreates the file, which gives it a new document identity
+and revokes the picker permission the habit tracker holds — the app then says
+access was withdrawn and asks you to Import the file again. To replace the contents
+of a sheet the app is already tracking, overwrite it in place instead, which keeps
+the grant and is picked up by the next refresh:
+
+```bash
+adb push HabitTracker2026.csv /sdcard/Documents/.staged.csv
+adb shell "cp /sdcard/Documents/.staged.csv /sdcard/Documents/HabitTracker2026.csv && rm /sdcard/Documents/.staged.csv"
+```
 
 ## Build and Quality Checks
 

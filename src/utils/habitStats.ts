@@ -1,20 +1,27 @@
 import type { HabitRow, HabitSheet, PeriodStats } from "../types";
-import { daysInRange, isFuture, today } from "./dateUtils";
+import { daysInRange, isFuture, isWeekend, today } from "./dateUtils";
 
 /**
  * Aggregation over a parsed habit sheet. Pure functions only — the same sheet
  * always yields the same numbers, which keeps the progress bars testable
  * independently of the spreadsheet or the UI.
  *
- * Every count here respects each habit's `trackedFrom` date: a habit added today
- * was not part of the routine last month, so it neither counts towards nor
- * against any day before it existed. Adding a habit therefore never changes a
- * past day's percentage.
+ * Every count here respects each habit's `trackedFrom` date and `dayType`: a
+ * habit added today was not part of the routine last month, and a weekend-only
+ * habit was never due on a Tuesday. Neither counts towards nor against a day it
+ * does not apply to, so adding a habit never changes a past day's percentage and
+ * a weekend chore never drags a weekday score down.
  */
 
-/** Was this habit part of the routine on `date`? */
+/** Does `habit`'s `dayType` cover this day of the week? */
+export function appliesOnDayType(habit: HabitRow, date: string): boolean {
+    if (habit.dayType === "both") return true;
+    return habit.dayType === (isWeekend(date) ? "weekend" : "weekday");
+}
+
+/** Was this habit part of the routine on `date`, and due on that kind of day? */
 function wasTracked(habit: HabitRow, date: string): boolean {
-    return date >= habit.trackedFrom;
+    return date >= habit.trackedFrom && appliesOnDayType(habit, date);
 }
 
 /** Habits completed on `date`, out of the habits tracked on that date. */

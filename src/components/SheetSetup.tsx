@@ -1,21 +1,24 @@
 import { useRef, useState } from "react";
+import type { HabitDayType } from "../types";
+import type { HabitSeed } from "../utils/habitSheet";
 import { isTauri } from "../utils/platform";
+import DayTypeSelect from "./DayTypeSelect";
 
 interface SheetSetupProps {
     year: number;
     /** Open an existing CSV sheet. In the browser a `File` comes from the input. */
     onOpen: (browserFile?: File) => void;
-    /** Create a CSV sheet seeded with these habit names. */
-    onCreate: (habitNames: string[]) => void;
+    /** Create a CSV sheet seeded with these habits. */
+    onCreate: (seeds: HabitSeed[]) => void;
     busy: boolean;
 }
 
-const STARTER_HABITS = [
-    "Wake up early",
-    "Exercise",
-    "Read",
-    "Meditate",
-    "No junk food",
+const STARTER_HABITS: HabitSeed[] = [
+    { name: "Wake up early", dayType: "both" },
+    { name: "Exercise", dayType: "both" },
+    { name: "Read", dayType: "both" },
+    { name: "Meditate", dayType: "both" },
+    { name: "No junk food", dayType: "both" },
 ];
 
 /**
@@ -24,18 +27,24 @@ const STARTER_HABITS = [
  * Shown until a sheet is chosen; after that the tracker remembers it.
  */
 export default function SheetSetup({ year, onOpen, onCreate, busy }: SheetSetupProps) {
-    const [habits, setHabits] = useState<string[]>(STARTER_HABITS);
+    const [habits, setHabits] = useState<HabitSeed[]>(STARTER_HABITS);
     const [draft, setDraft] = useState("");
+    const [draftDayType, setDraftDayType] = useState<HabitDayType>("both");
     const fileInput = useRef<HTMLInputElement>(null);
 
     function addDraft() {
         const name = draft.trim();
-        if (name === "" || habits.includes(name)) {
+        if (name === "" || habits.some((h) => h.name === name)) {
             setDraft("");
             return;
         }
-        setHabits([...habits, name]);
+        setHabits([...habits, { name, dayType: draftDayType }]);
         setDraft("");
+        setDraftDayType("both");
+    }
+
+    function setDayType(name: string, dayType: HabitDayType) {
+        setHabits(habits.map((h) => (h.name === name ? { ...h, dayType } : h)));
     }
 
     return (
@@ -87,13 +96,20 @@ export default function SheetSetup({ year, onOpen, onCreate, busy }: SheetSetupP
                     <p>Start a fresh sheet with these daily habits:</p>
 
                     <ul className="setup-habit-list">
-                        {habits.map((name) => (
-                            <li key={name}>
-                                <span>{name}</span>
+                        {habits.map((habit) => (
+                            <li key={habit.name}>
+                                <span>{habit.name}</span>
+                                <DayTypeSelect
+                                    value={habit.dayType}
+                                    label={`Days ${habit.name} applies to`}
+                                    onChange={(dayType) => setDayType(habit.name, dayType)}
+                                />
                                 <button
                                     className="remove-habit"
-                                    aria-label={`Remove ${name}`}
-                                    onClick={() => setHabits(habits.filter((h) => h !== name))}
+                                    aria-label={`Remove ${habit.name}`}
+                                    onClick={() =>
+                                        setHabits(habits.filter((h) => h.name !== habit.name))
+                                    }
                                 >
                                     ✕
                                 </button>
@@ -113,6 +129,11 @@ export default function SheetSetup({ year, onOpen, onCreate, busy }: SheetSetupP
                                     addDraft();
                                 }
                             }}
+                        />
+                        <DayTypeSelect
+                            value={draftDayType}
+                            label="Days the new habit applies to"
+                            onChange={setDraftDayType}
                         />
                         <button onClick={addDraft} disabled={draft.trim() === ""}>
                             Add

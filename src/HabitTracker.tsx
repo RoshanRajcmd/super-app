@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { IoChevronBackCircle } from "react-icons/io5";
-import type { HabitSheet, HabitViewMode } from "./types";
+import type { HabitDayType, HabitSheet, HabitViewMode } from "./types";
 import {
     SheetConflictError,
     createSheetLocation,
@@ -10,6 +10,7 @@ import {
     pickSheet,
     reloadSheet,
     saveSheet,
+    sheetMtime,
 } from "./utils/habitFile";
 import {
     addHabit as addHabitToBook,
@@ -19,6 +20,7 @@ import {
     serializeHabitBook,
     setMark,
     type HabitBook,
+    type HabitSeed,
 } from "./utils/habitSheet";
 import {
     daysInRange,
@@ -33,6 +35,7 @@ import { getStore } from "./utils/keyValueStore";
 import HabitDayView from "./components/HabitDayView";
 import HabitGrid from "./components/HabitGrid";
 import HabitHeatmap from "./components/HabitHeatmap";
+import DayTypeSelect from "./components/DayTypeSelect";
 import SheetSetup from "./components/SheetSetup";
 import SidebarButton from "./components/SidebarButton";
 import "./styles/HabitTracker.css";
@@ -51,6 +54,34 @@ interface HabitTrackerProps {
 const FROZEN_KEY = "habitColumnFrozen";
 
 /**
+ * How often to look for a copy of the sheet edited elsewhere — another machine
+ * writing into the same synced folder, or Excel on this one.
+ *
+ * Half a minute is frequent enough that a change made on a laptop shows up while
+ * the phone is still in hand, and rare enough to be a stat call rather than a
+ * drain.
+ */
+const REFRESH_MS = 30_000;
+
+/**
+ * Cheap content fingerprint (FNV-1a) telling whether a re-read of the sheet
+ * actually changed anything.
+ *
+ * Needed because some Android document providers report no modification time at
+ * all: for those the only way to answer "has it changed?" is to read the bytes and
+ * compare, and re-parsing an unchanged sheet would throw away the scroll position
+ * every thirty seconds.
+ */
+function fingerprint(bytes: Uint8Array): number {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < bytes.length; i++) {
+        hash ^= bytes[i];
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return hash >>> 0;
+}
+
+/**
  * Habit tracker over a `.csv` file.
  *
  * The parsed sheet is held in a ref, not state: it is a large mutable object that
@@ -60,6 +91,12 @@ const FROZEN_KEY = "habitColumnFrozen";
 export default function HabitTracker({ initialDate, initialView, onBack }: HabitTrackerProps) {
     const book = useRef<HabitBook | null>(null);
     const mtime = useRef<number | null>(null);
+    /** Fingerprint of the bytes the current book was parsed from. */
+    const loadedHash = useRef<number | null>(null);
+    /** Mirrors `busy` for the refresh poll, which must not re-run on every save. */
+    const busyRef = useRef(false);
+    /** Guards against a slow poll overlapping the next one. */
+    const refreshing = useRef(false);
 
     const [sheet, setSheet] = useState<HabitSheet | null>(null);
     const [sheetPath, setSheetPath] = useState<string | null>(null);
@@ -70,6 +107,7 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
     const [error, setError] = useState<string | null>(null);
     const [warning, setWarning] = useState<string | null>(null);
     const [newHabit, setNewHabit] = useState("");
+    const [newHabitDayType, setNewHabitDayType] = useState<HabitDayType>("both");
     const [frozen, setFrozen] = useState(true);
     /** Drives the browser's import, which needs a real file input to click. */
     const fileInput = useRef<HTMLInputElement>(null);
@@ -84,6 +122,7 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
                 name: h.name,
                 done: new Set(h.done),
                 trackedFrom: h.trackedFrom,
+                dayType: h.dayType,
             })),
         });
     }, []);
@@ -94,6 +133,7 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
             const parsed = parseHabitBook(bytes, year);
             book.current = parsed;
             mtime.current = fileMtime;
+            loadedHash.current = fingerprint(bytes);
             setSheetPath(path);
             setWarning(
                 parsed.unreadableHeaders.length > 0
@@ -130,6 +170,10 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
             active = false;
         };
     }, [adoptHandle, syncFromBook]);
+
+    useEffect(() => {
+        busyRef.current = busy;
+    }, [busy]);
 
     // Restore the frozen-column preference. Defaults to on until it arrives, so
     // the desktop case needs no wait.
@@ -171,7 +215,11 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
         if (!current) return;
 
         try {
-            mtime.current = await saveSheet(serializeHabitBook(current), mtime.current);
+            const bytes = serializeHabitBook(current);
+            mtime.current = await saveSheet(bytes, mtime.current);
+            // Remember what was written, so the refresh poll recognises our own
+            // save instead of treating it as an outside edit.
+            loadedHash.current = fingerprint(bytes);
             setError(null);
         } catch (e) {
             if (e instanceof SheetConflictError) {
@@ -208,6 +256,83 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
         [persist, syncFromBook]
     );
 
+    /**
+     * Pick up an outside edit: a stat first, and the bytes only if that says the
+     * file moved on (or cannot say).
+     *
+     * Skipped while a save is in flight, since the file is mid-write and the reply
+     * would be nonsense.
+     */
+    const refreshIfChanged = useCallback(async () => {
+        const current = book.current;
+        if (!current || busyRef.current || refreshing.current) return;
+
+        refreshing.current = true;
+        try {
+            const stamp = await sheetMtime();
+            if (stamp !== null && stamp === mtime.current) return;
+
+            const handle = await reloadSheet();
+            if (handle.bytes === null) return;
+
+            if (fingerprint(handle.bytes) === loadedHash.current) {
+                // Same content under a new timestamp — a sync client rewriting an
+                // identical file. Take the stamp so the next poll stays quiet.
+                mtime.current = handle.mtime;
+                return;
+            }
+
+            if (adoptHandle(handle.path, handle.bytes, handle.mtime, current.sheet.year)) {
+                syncFromBook();
+            }
+        } catch (e) {
+            // A background poll must not put an error banner over a working app,
+            // with one exception: a withdrawn permission never fixes itself, and
+            // silence would leave edits piling up against a file we can no longer
+            // read. That happens when another program replaces the file rather than
+            // rewriting it, which hands the document a new identity.
+            if (String(e).includes("withdrawn")) {
+                setError(
+                    "Lost access to the sheet — it was replaced by another program. Import it again to reconnect."
+                );
+            }
+            console.error("Habit sheet refresh failed:", e);
+        } finally {
+            refreshing.current = false;
+        }
+    }, [adoptHandle, syncFromBook]);
+
+    // Poll the file for edits made elsewhere, and check once more whenever the app
+    // comes back to the foreground — on a phone that is when a sync has usually
+    // just finished. Only runs once a sheet is open.
+    useEffect(() => {
+        if (sheetPath === null) return;
+
+        const timer = window.setInterval(() => {
+            if (document.visibilityState === "visible") void refreshIfChanged();
+        }, REFRESH_MS);
+
+        const onVisible = () => {
+            if (document.visibilityState === "visible") void refreshIfChanged();
+        };
+        document.addEventListener("visibilitychange", onVisible);
+
+        return () => {
+            window.clearInterval(timer);
+            document.removeEventListener("visibilitychange", onVisible);
+        };
+    }, [sheetPath, refreshIfChanged]);
+
+    /** Add the habit typed into the footer row, on the days its selector says. */
+    function submitNewHabit() {
+        const name = newHabit.trim();
+        if (name === "") return;
+        // Tracked from today, so past days keep their scores.
+        mutate((b) => addHabitToBook(b, name, today(), newHabitDayType));
+        setNewHabit("");
+        setNewHabitDayType("both");
+    }
+
     async function handleOpen(browserFile?: File) {
         setBusy(true);
         setError(null);
@@ -227,7 +352,7 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
         }
     }
 
-    async function handleCreate(habitNames: string[]) {
+    async function handleCreate(seeds: HabitSeed[]) {
         const year = dayjs().year();
         setBusy(true);
         setError(null);
@@ -237,7 +362,7 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
 
             // Seed habits start today: the earlier part of the year was never
             // tracked, so it should not count as missed.
-            book.current = createHabitBook(year, habitNames, today());
+            book.current = createHabitBook(year, seeds, today());
             // A location the user just chose holds no file yet, so there is
             // nothing to conflict with on this first write.
             mtime.current = handle.mtime;
@@ -526,22 +651,18 @@ export default function HabitTracker({ initialDate, initialView, onBack }: Habit
                         onKeyDown={(e) => {
                             if (e.key !== "Enter") return;
                             e.preventDefault();
-                            const name = newHabit.trim();
-                            if (name === "") return;
-                            // Tracked from today, so past days keep their scores.
-                            mutate((b) => addHabitToBook(b, name, today()));
-                            setNewHabit("");
+                            submitNewHabit();
                         }}
+                    />
+                    <DayTypeSelect
+                        value={newHabitDayType}
+                        label="Days the new habit applies to"
+                        disabled={busy}
+                        onChange={setNewHabitDayType}
                     />
                     <button
                         disabled={busy || newHabit.trim() === ""}
-                        onClick={() => {
-                            const name = newHabit.trim();
-                            if (name === "") return;
-                            // Tracked from today, so past days keep their scores.
-                            mutate((b) => addHabitToBook(b, name, today()));
-                            setNewHabit("");
-                        }}
+                        onClick={submitNewHabit}
                     >
                         Add habit
                     </button>

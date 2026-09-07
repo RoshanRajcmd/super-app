@@ -20,6 +20,16 @@ export interface AppState {
     currentApp: 'notes' | 'todos' | 'habits';
 }
 
+/**
+ * Which kind of day a habit belongs to, from the sheet's `DayType` column.
+ *
+ * Some habits only fit a weekend ("laundry"), some only a working day ("travel
+ * to office"), and most apply to both. A day a habit does not apply to is
+ * ignored entirely rather than counted as missed, the same way days before it
+ * joined the routine are.
+ */
+export type HabitDayType = "weekend" | "weekday" | "both";
+
 /** One daily-routine row of the habit spreadsheet. */
 export interface HabitRow {
     /** Habit name, from column A. */
@@ -34,6 +44,8 @@ export interface HabitRow {
      * entirely rather than counting it as missed.
      */
     trackedFrom: string;
+    /** Kind of day this habit applies to. `"both"` for most habits. */
+    dayType: HabitDayType;
 }
 
 /**
