@@ -135,6 +135,7 @@ macOS is assumed throughout (shell snippets are zsh, and paths such as
 
 ```bash
 npm install
+
 ```
 
 ### Step 3 — Run in the browser
@@ -198,8 +199,10 @@ Without Android Studio, download the
 into `~/Library/Android/sdk/cmdline-tools`, then install the packages:
 
 ```bash
+brew tap android/tap
+brew install android-cli
 export ANDROID_HOME="$HOME/Library/Android/sdk"
-SDKMANAGER="$ANDROID_HOME/cmdline-tools/bin/sdkmanager"   # Android Studio installs put this at cmdline-tools/latest/bin/sdkmanager
+SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"   # Android Studio installs put this at cmdline-tools/latest/bin/sdkmanager
 
 "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
   "platform-tools" \
@@ -275,9 +278,9 @@ edits afterwards.
 Create an AVD from the system image installed in step 5b (once), then boot it:
 
 ```bash
-"$ANDROID_HOME/cmdline-tools/bin/avdmanager" create avd \
+"$ANDROID_HOME/cmdline-tools/latest/bin/" create avd \
   --name Medium_Phone \
-  --package "system-images;android-36;google_apis_playstore;arm64-v8a" \
+  --package "system-images;android-36.1;google_apis_playstore;arm64-v8a" \
   --device pixel_6
 
 "$ANDROID_HOME/emulator/emulator" -avd Medium_Phone &
