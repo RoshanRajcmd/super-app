@@ -16,7 +16,8 @@
     "android:build": "tauri android build",
     "ios:init": "tauri ios init",
     "ios:dev": "tauri ios dev",
-    "ios:build": "tauri ios build"
+    "ios:build": "tauri ios build",
+    "clean": "rm -rf dist src-tauri/target src-tauri/gen/android/app/build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.9.1",

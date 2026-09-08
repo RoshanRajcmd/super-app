@@ -389,6 +389,19 @@ OUT=src-tauri/gen/android/app/build/outputs/apk/universal/release
 adb install -r "$OUT/app-universal-release.apk"
 ```
 
+## Clean Build Artifacts
+
+To remove generated build artifacts and free up disk space:
+
+```bash
+npm run clean
+```
+
+This removes the Vite `dist/`, Tauri/Rust `target/`, and Android `app/build/` directories. Source files and the tracked Android project remain untouched.
+
+>DO NOT DELETE ./src-tauri/gen/android/ and it content except `build`
+
+
 ## Android Reference
 
 Background that the step-by-step path above links to.
